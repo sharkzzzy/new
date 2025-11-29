@@ -249,62 +249,64 @@ class DynamicMaskManager:
     # -----------------------
     def _recompute_all(self):
         """
-        Recomputes masks based on Z-Order, Safety Boxes, and Temperature.
+        统一重算：
+        - 安全框裁剪
+        - z-order 去重叠
+        - 温度 softmax 前景互斥 + 背景底权重与归一化
+        - 羽化（图像尺度）并下采样到 latent 尺度
         """
         H, W = self.image_size
         
-        # 1) Safety Box Clipping
+        # 1) 应用安全框裁剪 (保持不变)
         for name in self.subject_names:
             box = self.safety_boxes.get(name, (0, 0, W, H))
             self.masks_img[name] = _clip_to_box(self.masks_img[name], box).clamp(0.0, 1.0)
 
-        # 2) Z-Order Handling
+        # 2) Z-Order 去重叠 (保持不变)
         occupied = torch.zeros(1, 1, H, W, device=self.device, dtype=self.dtype)
         masks_img_no_overlap: Dict[str, torch.Tensor] = {}
-        
         for name in self.z_order:
             m = self.masks_img[name].clamp(0.0, 1.0)
             effective = m * (1.0 - occupied)
             masks_img_no_overlap[name] = effective
             occupied = (occupied + effective).clamp(0.0, 1.0)
-
         self.masks_img = masks_img_no_overlap
 
-        # 3) Softmax Mutual Exclusion
+        # 3) 前景互斥（Softmax with temperature）-----> 修改重点在这里
         if len(self.subject_names) > 0:
-            # Re-stack
-            stack = torch.stack([self.masks_img[name] for name in self.subject_names], dim=0)
+            # 【关键修改 1】使用 torch.cat 代替 stack
+            # 结果形状: [N, 1, H, W] (4D)，而不是 [N, 1, 1, H, W] (5D)
+            stack = torch.cat([self.masks_img[name] for name in self.subject_names], dim=0)
             
-            # Feather slightly before softmax
-            stack = torch.stack([_feather(stack[i:i+1], radius=self.feather_radius_img)[0] for i in range(stack.shape[0])], dim=0)
+            # 【关键修改 2】直接对整个 Batch 进行羽化 (无需循环)
+            # _feather 内部调用 F.conv2d，支持 [N, 1, H, W] 输入
+            stack = _feather(stack, radius=self.feather_radius_img)
             
+            # 温度 softmax（互斥）
             fg_sharp = torch.softmax(stack / max(self.tau, 1e-6), dim=0)
             
+            # 写回
             for i, name in enumerate(self.subject_names):
-                self.masks_img[name] = fg_sharp[i:i+1]
+                self.masks_img[name] = fg_sharp[i:i+1] # 切片保持 [1, 1, H, W]
                 
             sum_fg = fg_sharp.sum(dim=0)
         else:
             sum_fg = torch.zeros(1, 1, H, W, device=self.device, dtype=self.dtype)
 
-        # 4) Background & Normalization
+        # 4) 背景计算与归一化 (保持不变)
         w_bg = (1.0 - sum_fg).clamp(0.0, 1.0) + self.bg_floor
         denom = w_bg + sum_fg + 1e-6
-        
         self.bg_mask_img = w_bg / denom
         for name in self.subject_names:
             self.masks_img[name] = self.masks_img[name] / denom
 
-        # 5) Downsample to Latent
+        # 5) 下采样到 latent 尺度 (保持不变)
         H_lat, W_lat = self.latent_size
         self.masks_latent = {}
         for name in self.subject_names:
-            self.masks_latent[name] = F.interpolate(
-                self.masks_img[name], size=(H_lat, W_lat), mode="bilinear", align_corners=False
-            )
-        self.bg_mask_latent = F.interpolate(
-            self.bg_mask_img, size=(H_lat, W_lat), mode="bilinear", align_corners=False
-        )
+            self.masks_latent[name] = F.interpolate(self.masks_img[name], size=(H_lat, W_lat), mode="bilinear", align_corners=False)
+        self.bg_mask_latent = F.interpolate(self.bg_mask_img, size=(H_lat, W_lat), mode="bilinear", align_corners=False)
+
 
     # -----------------------
     # Factories
