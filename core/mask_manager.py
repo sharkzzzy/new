@@ -272,24 +272,21 @@ class DynamicMaskManager:
             occupied = (occupied + effective).clamp(0.0, 1.0)
         self.masks_img = masks_img_no_overlap
 
-        # 3) 前景互斥（Softmax with temperature）-----> 修改重点在这里
+        # 3) 前景互斥
         if len(self.subject_names) > 0:
-            # 【关键修改 1】使用 torch.cat 代替 stack
-            # 结果形状: [N, 1, H, W] (4D)，而不是 [N, 1, 1, H, W] (5D)
             stack = torch.cat([self.masks_img[name] for name in self.subject_names], dim=0)
-            
-            # 【关键修改 2】直接对整个 Batch 进行羽化 (无需循环)
-            # _feather 内部调用 F.conv2d，支持 [N, 1, H, W] 输入
             stack = _feather(stack, radius=self.feather_radius_img)
-            
-            # 温度 softmax（互斥）
             fg_sharp = torch.softmax(stack / max(self.tau, 1e-6), dim=0)
             
-            # 写回
             for i, name in enumerate(self.subject_names):
-                self.masks_img[name] = fg_sharp[i:i+1] # 切片保持 [1, 1, H, W]
-                
-            sum_fg = fg_sharp.sum(dim=0)
+                self.masks_img[name] = fg_sharp[i:i+1]
+            
+            # 【修复点】确保维度是 [1, 1, H, W]
+            sum_fg = fg_sharp.sum(dim=0, keepdim=True) 
+            # 注意：如果 dim=0 是 N，keepdim=True 会得到 [1, 1, H, W] 吗？
+            # 假设 fg_sharp 是 [N, 1, H, W]。
+            # sum(dim=0, keepdim=True) -> [1, 1, H, W]。是对的。
+            # 之前的 sum(dim=0) 得到了 [1, H, W]。
         else:
             sum_fg = torch.zeros(1, 1, H, W, device=self.device, dtype=self.dtype)
 
