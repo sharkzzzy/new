@@ -1,4 +1,5 @@
-torch2.4_cuda11.8) linux@ubuntu-0965:~/Downloads/new-main(1)$ /home/linux/anaconda3/envs/torch2.4_cuda11.8/bin/python "/home/linux/Downloads/new-main(1)/tests/demo_zsrag.py"
+
+(torch2.4_cuda11.8) linux@ubuntu-0965:~/Downloads/new-main(1)$ /home/linux/anaconda3/envs/torch2.4_cuda11.8/bin/python "/home/linux/Downloads/new-main(1)/tests/demo_zsrag.py"
 /home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/controlnet_aux/mediapipe_face/mediapipe_face_common.py:7: UserWarning: The module 'mediapipe' is not installed. The package will have limited functionality. Please install it using the command: pip install 'mediapipe'
   warnings.warn(
 /home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/timm/models/layers/__init__.py:48: FutureWarning: Importing from timm.models.layers is deprecated, please import via timm.layers
@@ -16,19 +17,17 @@ torch2.4_cuda11.8) linux@ubuntu-0965:~/Downloads/new-main(1)$ /home/linux/anacon
 /home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/controlnet_aux/segment_anything/modeling/tiny_vit_sam.py:654: UserWarning: Overwriting tiny_vit_21m_512 in registry with controlnet_aux.segment_anything.modeling.tiny_vit_sam.tiny_vit_21m_512. This is because the name being registered conflicts with an existing name. Please check if this is not expected.
   return register_model(fn_wrapper)
 Loading Pipeline...
-Loading pipeline components...:   0%|                                                                                                                   | 0/7 [00:00<?, ?it/s]`torch_dtype` is deprecated! Use `dtype` instead!
-Loading pipeline components...: 100%|███████████████████████████████████████████████████████████████████████████████████████████████████████████| 7/7 [00:09<00:00,  1.38s/it]
+Loading pipeline components...:  29%|██████████████████████████████▌                                                                            | 2/7 [00:06<00:12,  2.59s/it]`torch_dtype` is deprecated! Use `dtype` instead!
+Loading pipeline components...: 100%|███████████████████████████████████████████████████████████████████████████████████████████████████████████| 7/7 [00:09<00:00,  1.34s/it]
 Using a slow image processor as `use_fast` is unset and a slow processor was saved with this model. `use_fast=True` will be the default behavior in v4.52, even if the model was saved with a slow processor. This will result in minor differences in outputs. You'll still be able to use a slow processor with `use_fast=False`.
-[IPAdapterXL] Loading Image Encoder: laion/CLIP-ViT-bigG-14-laion2B-39B-b160k...
-Loading checkpoint shards:   0%|                                                                                                                        | 0/2 [00:00<?, ?it/s]
-[IPAdapterXL] Failed to load bigG encoder, falling back to openai/clip-vit-large-patch14 (Quality may drop): Due to a serious vulnerability issue in `torch.load`, even with `weights_only=True`, we now require users to upgrade torch to at least v2.6 in order to use the function. This version restriction does not apply when loading files with safetensors.
-See the vulnerability report here https://nvd.nist.gov/vuln/detail/CVE-2025-32434
-[IPAdapterXL] Downloading weights from h94/IP-Adapter/sdxl_models/ip-adapter_sdxl_vit-h.bin...
-/home/linux/Downloads/new-main(1)/zsrag/core/ip_adapter_wrapper.py:192: FutureWarning: You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.
+[IPAdapterXL] Loading Image Encoder: openai/clip-vit-large-patch14...
+[IPAdapterXL] Downloading weights from h94/IP-Adapter/sdxl_models/ip-adapter_sdxl.bin...
+ip-adapter_sdxl.bin: 100%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 703M/703M [03:12<00:00, 3.65MB/s]
+/home/linux/Downloads/new-main(1)/zsrag/core/ip_adapter_wrapper.py:202: FutureWarning: You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.
   sd = torch.load(path, map_location="cpu")
-[IPAdapterXL] Projector weights loaded successfully.
+[IPAdapterXL] Resampler weights loaded successfully.
 Running ZS-RAG...
-100%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 20/20 [00:25<00:00,  1.28s/it]
+100%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 20/20 [00:25<00:00,  1.29s/it]
 /home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/controlnet_aux/lineart/__init__.py:112: FutureWarning: You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.
   model.load_state_dict(torch.load(model_path, map_location=torch.device('cpu')))
 /home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/controlnet_aux/lineart/__init__.py:116: FutureWarning: You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.
@@ -46,32 +45,42 @@ Traceback (most recent call last):
     bind = pipeline.bind_attributes(
   File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/torch/utils/_contextlib.py", line 116, in decorate_context
     return func(*args, **kwargs)
-  File "/home/linux/Downloads/new-main(1)/zsrag/pipelines/pipeline_zsrag_inpaint.py", line 309, in bind_attributes
-    embs_sub = self._prepare_subject_embeddings(width, height, subjects, add_ip_refs=True)
-  File "/home/linux/Downloads/new-main(1)/zsrag/pipelines/pipeline_zsrag_inpaint.py", line 262, in _prepare_subject_embeddings
-    pos_embs = self.ip_mgr.merge_subject_refs_into_text(name, pe, agg="mean")
+  File "/home/linux/Downloads/new-main(1)/zsrag/pipelines/pipeline_zsrag_inpaint.py", line 467, in bind_attributes
+    image_out = decode_vae(self.pipe.vae, latents_iter)
   File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/torch/utils/_contextlib.py", line 116, in decorate_context
     return func(*args, **kwargs)
-  File "/home/linux/Downloads/new-main(1)/zsrag/core/ip_adapter_wrapper.py", line 297, in merge_subject_refs_into_text
-    emb1, emb2 = self.compute_embeds_for(name, agg=agg)
-  File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/torch/utils/_contextlib.py", line 116, in decorate_context
-    return func(*args, **kwargs)
-  File "/home/linux/Downloads/new-main(1)/zsrag/core/ip_adapter_wrapper.py", line 289, in compute_embeds_for
-    e1, e2 = self.ip.compute_image_prompt_embeds(ref["image"], weight=ref["weight"])
-  File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/torch/utils/_contextlib.py", line 116, in decorate_context
-    return func(*args, **kwargs)
-  File "/home/linux/Downloads/new-main(1)/zsrag/core/ip_adapter_wrapper.py", line 247, in compute_image_prompt_embeds
-    ip_tokens = self.image_proj(image_embeds.to(self.dtype))
+  File "/home/linux/Downloads/new-main(1)/zsrag/core/utils.py", line 215, in decode_vae
+    image = vae.decode(latents).sample
+  File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/diffusers/utils/accelerate_utils.py", line 46, in wrapper
+    return method(self, *args, **kwargs)
+  File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/diffusers/models/autoencoders/autoencoder_kl.py", line 323, in decode
+    decoded = self._decode(z).sample
+  File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/diffusers/models/autoencoders/autoencoder_kl.py", line 294, in _decode
+    dec = self.decoder(z)
   File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1553, in _wrapped_call_impl
     return self._call_impl(*args, **kwargs)
   File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1562, in _call_impl
     return forward_call(*args, **kwargs)
-  File "/home/linux/Downloads/new-main(1)/zsrag/core/ip_adapter_wrapper.py", line 84, in forward
-    x = self.proj_in(x)
+  File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/diffusers/models/autoencoders/vae.py", line 305, in forward
+    sample = up_block(sample, latent_embeds)
   File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1553, in _wrapped_call_impl
     return self._call_impl(*args, **kwargs)
   File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1562, in _call_impl
     return forward_call(*args, **kwargs)
-  File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/torch/nn/modules/linear.py", line 117, in forward
-    return F.linear(input, self.weight, self.bias)
-RuntimeError: mat1 and mat2 shapes cannot be multiplied (1x768 and 1024x1280)
+  File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/diffusers/models/unets/unet_2d_blocks.py", line 2643, in forward
+    hidden_states = upsampler(hidden_states)
+  File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1553, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1562, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/diffusers/models/upsampling.py", line 188, in forward
+    hidden_states = self.conv(hidden_states)
+  File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1553, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1562, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/torch/nn/modules/conv.py", line 458, in forward
+    return self._conv_forward(input, self.weight, self.bias)
+  File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/torch/nn/modules/conv.py", line 454, in _conv_forward
+    return F.conv2d(input, weight, bias, self.stride,
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 1024.00 MiB. GPU 0 has a total capacity of 21.66 GiB of which 961.94 MiB is free. Including non-PyTorch memory, this process has 20.72 GiB memory in use. Of the allocated memory 18.33 GiB is allocated by PyTorch, and 2.21 GiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
