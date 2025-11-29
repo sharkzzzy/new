@@ -1,12 +1,15 @@
 """
 zsrag/core/ip_adapter_wrapper.py
 IP-Adapter wrapper for SDXL (Training-Free).
-FIXED VERSION: Uses official Perceiver Resampler architecture and weights.
+FINAL FIXED VERSION: 
+- Uses CLIP ViT-L (768 dim) + Resampler (2048 dim output).
+- Splits output into 1280|768 to match SDXL dual-text-encoder interface.
+- Includes dtype alignment and robust feature extraction.
 
 Features:
-- Encodes reference images using CLIP Vision Model.
-- Uses Perceiver Resampler to project features (Official SDXL Arch).
-- Downloads official weights from h94/IP-Adapter/sdxl_models.
+- Encodes images using standard openai/clip-vit-large-patch14.
+- Uses official Resampler architecture (Cross-Attn based).
+- Loads official IP-Adapter SDXL (ViT-L variant) weights.
 """
 
 import os
@@ -30,6 +33,7 @@ try:
 except ImportError:
     _HAS_PIL = False
 
+
 def _ensure_deps():
     missing = []
     if not _HAS_TRANSFORMERS: missing.append("transformers")
@@ -38,7 +42,7 @@ def _ensure_deps():
         raise ImportError(f"ip_adapter_wrapper requires: {', '.join(missing)}. Please install them.")
 
 def _to_uint8_image(t: torch.Tensor) -> Image.Image:
-    """ Converts [C,H,W] tensor to PIL Image. """
+    """ Converts [C,H,W] tensor (0..1 or -1..1) to PIL Image. """
     if t.ndim != 3 or t.shape[0] < 1:
         raise ValueError("Expected tensor of shape [C,H,W].")
     img = t.detach().cpu()
@@ -49,8 +53,9 @@ def _to_uint8_image(t: torch.Tensor) -> Image.Image:
     from torchvision.transforms.functional import to_pil_image
     return to_pil_image(img)
 
+
 # ==============================================================================
-# Perceiver Resampler (Official SDXL IP-Adapter Architecture)
+# Perceiver Resampler Architecture
 # ==============================================================================
 class Resampler(nn.Module):
     def __init__(
@@ -60,7 +65,7 @@ class Resampler(nn.Module):
         dim_head=64,
         heads=20,
         num_queries=8,
-        embedding_dim=1280,
+        embedding_dim=768,
         output_dim=1024,
         ff_mult=4,
     ):
@@ -125,50 +130,57 @@ class FeedForward(nn.Module):
     def forward(self, x):
         return self.net(x)
 
+
 # ==============================================================================
 # IP-Adapter Wrapper
 # ==============================================================================
 class IPAdapterXL:
     """
-    IP-Adapter SDXL Wrapper using official weights.
+    IP-Adapter SDXL Wrapper (ViT-L variant).
     """
     def __init__(
         self,
-        clip_model_name: str = "laion/CLIP-ViT-bigG-14-laion2B-39B-b160k", # Or openai/clip-vit-large-patch14
+        clip_model_name: str = "openai/clip-vit-large-patch14",
         device: Optional[torch.device] = None,
         dtype: Optional[torch.dtype] = None,
-        # Default to official repo and file
+        num_image_tokens: int = 4,
+        # Default to official SDXL ViT-L weights
         hf_repo_id: str = "h94/IP-Adapter",
-        hf_filename: str = "sdxl_models/ip-adapter_sdxl_vit-h.bin",
+        hf_filename: str = "sdxl_models/ip-adapter_sdxl.bin", 
         local_weights_path: Optional[str] = None,
     ):
         _ensure_deps()
         self.device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.dtype = dtype or torch.float16
-        
-        # 1. Load Image Encoder
-        # Note: Official IP-Adapter SDXL uses CLIP ViT-H (OpenCLIP bigG)
+        self.num_image_tokens = int(num_image_tokens)
+
+        # 1. Load CLIP Vision Encoder (ViT-L, 768 dim)
         print(f"[IPAdapterXL] Loading Image Encoder: {clip_model_name}...")
         try:
             self.clip_image_processor = CLIPProcessor.from_pretrained(clip_model_name)
-            self.clip_image_encoder = CLIPVisionModelWithProjection.from_pretrained(clip_model_name).to(self.device, dtype=self.dtype)
+            self.clip_image_encoder = CLIPVisionModelWithProjection.from_pretrained(
+                clip_model_name
+            ).to(self.device, dtype=self.dtype)
         except Exception as e:
-            print(f"[IPAdapterXL] Failed to load bigG encoder, falling back to openai/clip-vit-large-patch14 (Quality may drop): {e}")
-            fallback = "openai/clip-vit-large-patch14"
-            self.clip_image_processor = CLIPProcessor.from_pretrained(fallback)
-            self.clip_image_encoder = CLIPVisionModelWithProjection.from_pretrained(fallback).to(self.device, dtype=self.dtype)
+            raise RuntimeError(f"Failed to load CLIP encoder {clip_model_name}: {e}")
 
-        # 2. Init Resampler (Projector)
-        # Official Config for SDXL ViT-H IP-Adapter:
-        # dim=1280 (ViT-H), output_dim=2048 (SDXL CrossAttn), num_queries=4
-        self.image_proj = Resampler(
-            dim=1280,
-            depth=4,
-            dim_head=64,
-            heads=20,
-            num_queries=4, # Standard SDXL IP-Adapter uses 4 tokens
-            embedding_dim=self.clip_image_encoder.config.hidden_size,
-            output_dim=2048,
+        # Check dimension (ViT-L/14 projection dim is 768)
+        # Note: If hidden_size is 1024 but projection is 768, we need 768.
+        self.clip_feat_dim = self.clip_image_encoder.config.projection_dim if hasattr(self.clip_image_encoder.config, "projection_dim") else self.clip_image_encoder.config.hidden_size
+        
+        if self.clip_feat_dim != 768:
+             print(f"[IPAdapterXL] Warning: Encoder dim is {self.clip_feat_dim}, expected 768 for standard ViT-L weights.")
+
+        # 2. Init Resampler
+        # Config for ViT-L variant: embedding_dim=768 -> output=2048
+        self.resampler = Resampler(
+            dim=1280, 
+            depth=4, 
+            dim_head=64, 
+            heads=20, 
+            num_queries=num_image_tokens, 
+            embedding_dim=self.clip_feat_dim, 
+            output_dim=2048, 
             ff_mult=4
         ).to(self.device, dtype=self.dtype)
 
@@ -182,33 +194,30 @@ class IPAdapterXL:
         if local_path and os.path.exists(local_path):
             print(f"[IPAdapterXL] Loading local weights: {local_path}")
             sd = torch.load(local_path, map_location="cpu")
-        
-        # Try Hub
-        if sd is None:
+        elif repo_id and filename:
             try:
                 from huggingface_hub import hf_hub_download
                 print(f"[IPAdapterXL] Downloading weights from {repo_id}/{filename}...")
                 path = hf_hub_download(repo_id=repo_id, filename=filename)
                 sd = torch.load(path, map_location="cpu")
             except Exception as e:
-                print(f"[IPAdapterXL] Download failed: {e}")
+                print(f"[IPAdapterXL] Download failed: {e}. Using random init.")
                 
         if sd is not None:
-            # Official weights have keys "image_proj_model.latents", etc. or just "image_proj..."
-            # We need to strip prefixes if necessary.
+            # Handle keys: "image_proj.xxx" -> "xxx"
+            # Official weights usually prefix with "image_proj." or "image_proj_model."
             new_sd = {}
             for k, v in sd.items():
-                if k.startswith("image_proj_model."):
+                if k.startswith("image_proj."):
+                    new_sd[k.replace("image_proj.", "")] = v
+                elif k.startswith("image_proj_model."):
                     new_sd[k.replace("image_proj_model.", "")] = v
-                elif k.startswith("ip_adapter."): # Some variations
-                    pass # ignore unet weights if bundled
-                else:
-                    new_sd[k] = v
+                elif "ip_adapter" in k: pass 
+                else: new_sd[k] = v
             
-            # Load
             try:
-                self.image_proj.load_state_dict(new_sd, strict=False)
-                print("[IPAdapterXL] Projector weights loaded successfully.")
+                self.resampler.load_state_dict(new_sd, strict=False)
+                print("[IPAdapterXL] Resampler weights loaded successfully.")
             except Exception as e:
                 print(f"[IPAdapterXL] Weight loading mismatch: {e}. Using random init.")
         else:
@@ -219,39 +228,38 @@ class IPAdapterXL:
         self,
         image: Union[Image.Image, torch.Tensor],
         weight: Optional[float] = None,
+        normalize: bool = True,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
-        Returns (emb_1280, emb_768) split from the 2048-dim output.
+        Returns (emb_1280, emb_768) by splitting the 2048-dim Resampler output.
         """
         w = float(self.default_weight if weight is None else weight)
         
-        # Preprocess
         if isinstance(image, torch.Tensor):
             pil = _to_uint8_image(image)
         else:
             pil = image
             
         inputs = self.clip_image_processor(images=pil, return_tensors="pt").to(self.device)
-        
-        # Encode Image
-        # Use hidden_states[-2] usually for IP-Adapter, but standard SDXL IP-Adapter uses projection output?
-        # Official IP-Adapter code uses `image_encoder(clip_image).image_embeds` which is the projection.
         clip_out = self.clip_image_encoder(**inputs)
-        image_embeds = clip_out.image_embeds # [1, 1280] or similar
         
-        # Resampler expects [B, Seq, Dim], so unsqueeze sequence dim
-        image_embeds = image_embeds.unsqueeze(1) # [B, 1, 1280]
+        # Robust feature extraction
+        if hasattr(clip_out, "image_embeds") and clip_out.image_embeds is not None:
+            image_embeds = clip_out.image_embeds # [B, 768]
+        elif hasattr(clip_out, "pooler_output") and clip_out.pooler_output is not None:
+            image_embeds = clip_out.pooler_output 
+        else:
+            # Fallback
+            image_embeds = clip_out.last_hidden_state.mean(dim=1)
+            
+        # Resampler expects sequence dim: [B, 1, Dim]
+        image_embeds = image_embeds.unsqueeze(1).to(self.dtype)
         
-        # Project
-        # Output: [B, 4, 2048]
-        ip_tokens = self.image_proj(image_embeds.to(self.dtype))
-        
-        # Scale
+        # Project -> [B, M, 2048]
+        ip_tokens = self.resampler(image_embeds)
         ip_tokens = ip_tokens * w
         
-        # Split into 1280 + 768 for compatibility with our pipeline injection
-        # SDXL CrossAttn expects 2048. Our utils `merge_with_text_tokens` expects two parts.
-        # We slice it here to satisfy the API.
+        # Split output to 1280 | 768
         emb_1280 = ip_tokens[..., :1280]
         emb_768 = ip_tokens[..., 1280:]
         
@@ -264,10 +272,19 @@ class IPAdapterXL:
         image_prompt_embeds: torch.Tensor,
         image_prompt_embeds_2: torch.Tensor,
     ) -> torch.Tensor:
-        # Re-concat
-        img_tokens = torch.cat([image_prompt_embeds, image_prompt_embeds_2], dim=-1) # [B, M, 2048]
+        """
+        Merges image tokens into text embeddings.
+        Ensures dtype alignment before concatenation.
+        """
+        # Re-concat back to 2048
+        img_tokens = torch.cat([image_prompt_embeds, image_prompt_embeds_2], dim=-1)
+        
+        # Align dtype with text embeddings (often FP32)
+        img_tokens = img_tokens.to(text_prompt_embeds.dtype)
+        
         merged = torch.cat([text_prompt_embeds, img_tokens], dim=1)
         return merged
+
 
 class IPAdapterManager:
     def __init__(self, ip_adapter: IPAdapterXL):
@@ -288,7 +305,9 @@ class IPAdapterManager:
         for ref in self.refs[name]:
             e1, e2 = self.ip.compute_image_prompt_embeds(ref["image"], weight=ref["weight"])
             e1_list.append(e1); e2_list.append(e2)
-        e1 = torch.stack(e1_list, dim=0).mean(dim=0) # Simple mean aggregation
+        
+        # Stack: [K, B, M, D] -> Mean: [B, M, D]
+        e1 = torch.stack(e1_list, dim=0).mean(dim=0)
         e2 = torch.stack(e2_list, dim=0).mean(dim=0)
         return e1, e2
 
