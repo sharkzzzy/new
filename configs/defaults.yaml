@@ -1,0 +1,45 @@
+# 默认配置（可被 runner.py 的 --config 指定加载）
+global_prompt: "a scenic park, sunny lighting, photorealistic, high quality"
+width: 1024
+height: 1024
+seed: 42
+
+# 阶段 A（几何自举）
+bootstrap_steps: 20
+bootstrap_guidance: 5.5
+
+# 阶段 B（掩码）
+use_sam: false
+use_grounded_dino: false
+safety_expand: 0.05
+tau: 0.8
+bg_floor: 0.05
+gap_ratio: 0.06
+
+# 阶段 C（属性绑定）
+num_inference_steps: 40
+cfg_pos: 7.5
+cfg_neg: 3.0
+kappa: 1.0
+iter_clip: 2
+clip_threshold: 0.32
+probe_interval: 5
+
+# 阶段 D（全局重整）
+sde_strength: 0.3
+sde_steps: 20
+sde_guidance: 5.0
+
+# Subjects 示例（可单独用 subjects_json 或命令行传入覆盖）
+subjects:
+  - name: "cat"
+    prompt: "a red cat sitting, full body, fluffy, sharp details, left side, clearly separated"
+    position: "left"
+    neg_target: "blue dog, blue fur"
+    # ref_image: "assets/red_fur_patch.png"
+
+  - name: "dog"
+    prompt: "a blue dog sitting, full body, sharp details, right side, clearly separated"
+    position: "right"
+    neg_target: "red cat, red fur"
+    # ref_image: "assets/blue_fur_patch.png"
