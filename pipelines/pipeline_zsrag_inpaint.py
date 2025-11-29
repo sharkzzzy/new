@@ -297,7 +297,9 @@ class ZSRAGPipeline:
         self.attn_proc.set_base_latent_hw(H_lat, W_lat)
 
         scheduler = self.pipe.scheduler
-        timesteps = prepare_timesteps(scheduler, num_inference_steps=num_inference_steps, device=self.device)
+        
+        # Initial Latents (Created once, reused as starting point)
+        # Note: timesteps will be set inside the loop
         latents = prepare_latents(1, 4, H_lat, W_lat, self.pipe.unet.dtype, self.device, scheduler, seed=seed)
 
         # Global Background Embeds
@@ -316,6 +318,10 @@ class ZSRAGPipeline:
         
         # Iteration Loop (Feedback-Driven)
         for iter_idx in range(max(1, int(iter_clip) + 1)):
+            
+            # 【CRITICAL FIX】Reset scheduler state for each iteration
+            # This resets 'step_index' to 0 and re-calculates sigmas
+            timesteps = prepare_timesteps(scheduler, num_inference_steps=num_inference_steps, device=self.device)
             
             # CLIP Feedback Adjustment
             if iter_idx > 0 and image_out is not None:
@@ -338,15 +344,14 @@ class ZSRAGPipeline:
                 print(f"[ZS-RAG] Iter {iter_idx} CLIP suggestions: {per_subject_cfg}")
 
             # Diffusion Loop
-            latents_iter = latents.clone() # Start from same noise
+            # Always start from the original noisy latents for Fair Comparison between iterations
+            latents_iter = latents.clone() 
             
             for step_idx, t in enumerate(timesteps):
                 self.attn_proc.set_step_index(step_idx, num_inference_steps)
                 latent_model_input = scheduler.scale_model_input(latents_iter, t)
 
                 # 1. Background Recording (Phase A)
-                # We record self-attention keys/values from global background prompt
-                # Only needs to run occasionally to refresh structure
                 if step_idx % 3 == 0:
                     self.context_bank.clear()
                     self.attn_proc.set_mode("record_bg")
@@ -368,7 +373,7 @@ class ZSRAGPipeline:
                     added_cond_kwargs_uncond=added_global_uncond,
                     attn_proc=self.attn_proc,
                     cfg_pos=float(cfg_pos),
-                    gate_uncond=False, gate_pos=False, # Background is global, ungated
+                    gate_uncond=False, gate_pos=False, 
                     mode_uncond="off", mode_pos="off",
                 )
 
@@ -385,13 +390,10 @@ class ZSRAGPipeline:
                     self.attn_proc.set_region_mask(masks_latent_gate[name])
                     self.attn_proc.set_subject_id(subj_idx)
 
-                    # Dynamic IP-Adapter Weight Update (if changed during iteration)
+                    # Dynamic IP-Adapter Weight Update
                     if "ip_weight" in per_subject_cfg[name]:
-                        # Re-merge with new weight
-                        self.ip_mgr.clear() # clear only affects adding, not existing references in list logic if not cleared
-                        # Note: IPAdapterManager stores list of refs. 
-                        # To update weight, we re-add.
-                        # Optimization: store ref_image outside to re-use.
+                        # Optimized: Re-merge only if weight changed significant logic needed here
+                        # For now, simplistic re-calc (performance hit is minimal compared to UNet)
                         ref_image = s.get("ref_image", None)
                         if ref_image is None:
                             color_rgb = parse_color_from_text(s["prompt"])
@@ -399,19 +401,9 @@ class ZSRAGPipeline:
                                 ref_image = make_color_patch(color_rgb, size=(256, 256))
                                 
                         if ref_image is not None:
-                            # IMPORTANT: clear old refs for this subject inside manager or clear all
-                            # IPAdapterManager.clear() clears ALL. 
-                            # We need to clear just this subject or rebuild all.
-                            # For simplicity, we assume IPAdapterManager handles subject-specific compute independently.
-                            # We can just clear and re-add for this subject if we implemented remove.
-                            # Here, we just clear EVERYTHING before loop or per subject logic?
-                            # Actually compute_embeds_for relies on stored refs. 
-                            # Let's clean the specific subject refs if possible, or just overwrite emb["pos"] 
-                            # using a temporary manager logic?
-                            # Simplest: The manager.clear() clears dict. 
-                            # So inside this loop, we might need to be careful.
-                            # Better: Re-calculate 'emb["pos"]' using the ip_adapter directly helper.
-                            pass # (Simplified: assuming weights don't drift drastically per step, or handled via pre-calc)
+                            self.ip_mgr.clear()
+                            self.ip_mgr.add_reference(name, ref_image, weight=float(per_subject_cfg[name]["ip_weight"]))
+                            emb["pos"] = self.ip_mgr.merge_subject_refs_into_text(name, emb["pos"], agg="mean")
 
                     # CFG Calculation
                     if emb["neg"] is not None and emb["added_neg"] is not None:
@@ -464,10 +456,14 @@ class ZSRAGPipeline:
                         mask_mgr.update_from_attn(maps_img, beta=0.6, thresh=0.5, erode_k=5, blur_ksize=15, blur_sigma=2.5)
 
             # Decode Final Image for this iteration
+            # We must decode to evaluate CLIP scores for the next loop
             image_out = decode_vae(self.pipe.vae, latents_iter)
-            latents = latents_iter.clone() # Update result latents
+            
+            # Update latents for final return (after loop ends)
+            final_latents = latents_iter.clone()
 
-        return {"image": image_out, "latents": latents, "masks_img": mask_mgr.get_masks_img()}
+        return {"image": image_out, "latents": final_latents, "masks_img": mask_mgr.get_masks_img()}
+
 
     # ---------------------------------
     # Stage D: Global Harmonization
