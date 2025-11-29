@@ -1,6 +1,8 @@
-
-
-
+torch2.4_cuda11.8) linux@ubuntu-0965:~/Downloads/new-main(1)$ /home/linux/anaconda3/envs/torch2.4_cuda11.8/bin/python "/home/linux/Downloads/new-main(1)/tests/demo_zsrag.py"
+/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/controlnet_aux/mediapipe_face/mediapipe_face_common.py:7: UserWarning: The module 'mediapipe' is not installed. The package will have limited functionality. Please install it using the command: pip install 'mediapipe'
+  warnings.warn(
+/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/timm/models/layers/__init__.py:48: FutureWarning: Importing from timm.models.layers is deprecated, please import via timm.layers
+  warnings.warn(f"Importing from {__name__} is deprecated, please import via timm.layers", FutureWarning)
 /home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/timm/models/registry.py:4: FutureWarning: Importing from timm.models.registry is deprecated, please import via timm.models
   warnings.warn(f"Importing from {__name__} is deprecated, please import via timm.models", FutureWarning)
 /home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/controlnet_aux/segment_anything/modeling/tiny_vit_sam.py:654: UserWarning: Overwriting tiny_vit_5m_224 in registry with controlnet_aux.segment_anything.modeling.tiny_vit_sam.tiny_vit_5m_224. This is because the name being registered conflicts with an existing name. Please check if this is not expected.
@@ -15,7 +17,7 @@
   return register_model(fn_wrapper)
 Loading Pipeline...
 Loading pipeline components...:   0%|                                                                                                                   | 0/7 [00:00<?, ?it/s]`torch_dtype` is deprecated! Use `dtype` instead!
-Loading pipeline components...: 100%|███████████████████████████████████████████████████████████████████████████████████████████████████████████| 7/7 [00:10<00:00,  1.45s/it]
+Loading pipeline components...: 100%|███████████████████████████████████████████████████████████████████████████████████████████████████████████| 7/7 [00:09<00:00,  1.38s/it]
 Using a slow image processor as `use_fast` is unset and a slow processor was saved with this model. `use_fast=True` will be the default behavior in v4.52, even if the model was saved with a slow processor. This will result in minor differences in outputs. You'll still be able to use a slow processor with `use_fast=False`.
 [IPAdapterXL] Loading Image Encoder: laion/CLIP-ViT-bigG-14-laion2B-39B-b160k...
 Loading checkpoint shards:   0%|                                                                                                                        | 0/2 [00:00<?, ?it/s]
@@ -40,16 +42,36 @@ Traceback (most recent call last):
     result = run_zsrag(
   File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/torch/utils/_contextlib.py", line 116, in decorate_context
     return func(*args, **kwargs)
-  File "/home/linux/Downloads/new-main(1)/zsrag/pipelines/pipeline_zsrag_inpaint.py", line 594, in run_zsrag
-    mask_mgr = pipeline.build_masks(
-  File "/home/linux/Downloads/new-main(1)/zsrag/pipelines/pipeline_zsrag_inpaint.py", line 200, in build_masks
-    mgr = DynamicMaskManager.init_from_positions(
-  File "/home/linux/Downloads/new-main(1)/zsrag/core/mask_manager.py", line 378, in init_from_positions
-    return DynamicMaskManager(
-  File "/home/linux/Downloads/new-main(1)/zsrag/core/mask_manager.py", line 120, in __init__
-    self._recompute_all()
-  File "/home/linux/Downloads/new-main(1)/zsrag/core/mask_manager.py", line 308, in _recompute_all
-    self.bg_mask_latent = F.interpolate(self.bg_mask_img, size=(H_lat, W_lat), mode="bilinear", align_corners=False)
-  File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/torch/nn/functional.py", line 3983, in interpolate
-    raise ValueError(
-ValueError: Input and output must have the same number of spatial dimensions, but got input with spatial dimensions of [1024] and output size of (128, 128). Please provide input tensor in (N, C, d1, d2, ...,dK) format and output size in (o1, o2, ...,oK) format.
+  File "/home/linux/Downloads/new-main(1)/zsrag/pipelines/pipeline_zsrag_inpaint.py", line 602, in run_zsrag
+    bind = pipeline.bind_attributes(
+  File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/torch/utils/_contextlib.py", line 116, in decorate_context
+    return func(*args, **kwargs)
+  File "/home/linux/Downloads/new-main(1)/zsrag/pipelines/pipeline_zsrag_inpaint.py", line 309, in bind_attributes
+    embs_sub = self._prepare_subject_embeddings(width, height, subjects, add_ip_refs=True)
+  File "/home/linux/Downloads/new-main(1)/zsrag/pipelines/pipeline_zsrag_inpaint.py", line 262, in _prepare_subject_embeddings
+    pos_embs = self.ip_mgr.merge_subject_refs_into_text(name, pe, agg="mean")
+  File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/torch/utils/_contextlib.py", line 116, in decorate_context
+    return func(*args, **kwargs)
+  File "/home/linux/Downloads/new-main(1)/zsrag/core/ip_adapter_wrapper.py", line 297, in merge_subject_refs_into_text
+    emb1, emb2 = self.compute_embeds_for(name, agg=agg)
+  File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/torch/utils/_contextlib.py", line 116, in decorate_context
+    return func(*args, **kwargs)
+  File "/home/linux/Downloads/new-main(1)/zsrag/core/ip_adapter_wrapper.py", line 289, in compute_embeds_for
+    e1, e2 = self.ip.compute_image_prompt_embeds(ref["image"], weight=ref["weight"])
+  File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/torch/utils/_contextlib.py", line 116, in decorate_context
+    return func(*args, **kwargs)
+  File "/home/linux/Downloads/new-main(1)/zsrag/core/ip_adapter_wrapper.py", line 247, in compute_image_prompt_embeds
+    ip_tokens = self.image_proj(image_embeds.to(self.dtype))
+  File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1553, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1562, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/linux/Downloads/new-main(1)/zsrag/core/ip_adapter_wrapper.py", line 84, in forward
+    x = self.proj_in(x)
+  File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1553, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1562, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/torch/nn/modules/linear.py", line 117, in forward
+    return F.linear(input, self.weight, self.bias)
+RuntimeError: mat1 and mat2 shapes cannot be multiplied (1x768 and 1024x1280)
