@@ -1,1 +1,5 @@
-·1
+import os
+
+# 设置代理
+os.environ["http_proxy"] = "http://proxy.mornai.cn:7890"
+os.environ["https_proxy"] = "http://proxy.mornai.cn:7890"
