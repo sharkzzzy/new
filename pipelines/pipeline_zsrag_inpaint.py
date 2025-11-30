@@ -254,16 +254,16 @@ class ZSRAGPipeline:
                         ref_image = make_color_patch(color_rgb, size=(256, 256))
                 
                 if ref_image is not None:
-                    self.ip_mgr.clear() # Clear prev subject refs
+                    self.ip_mgr.clear()
                     self.ip_mgr.add_reference(name, ref_image, weight=float(subj.get("ip_weight", 1.0)))
-                    
-                    # Merge image tokens into text embeddings
-                    # Note: this modifies the 'pos_embs' tensor shape to [B, N+M, D]
+                    # Merge image tokens (Initial merge)
                     pos_embs = self.ip_mgr.merge_subject_refs_into_text(name, pe, agg="mean")
 
+             
             # Pack
             embs[name] = {
-                "pos": pos_embs,
+                "pos_raw": pe, # 【新增】保存纯净的文本 Embedding 备份！
+                "pos": pos_embs, # 这是当前使用的（可能含图像）
                 "uncond": ne,
                 "neg": nt_pe,
                 "added_pos": {"text_embeds": pp, "time_ids": add_time_ids},
@@ -406,7 +406,10 @@ class ZSRAGPipeline:
                         if ref_image is not None:
                             self.ip_mgr.clear()
                             self.ip_mgr.add_reference(name, ref_image, weight=float(per_subject_cfg[name]["ip_weight"]))
-                            emb["pos"] = self.ip_mgr.merge_subject_refs_into_text(name, emb["pos"], agg="mean")
+                            
+                            # 【关键修正】始终使用 pos_raw (纯文本) 进行 merge，而不是在 emb["pos"] 上累加
+                            emb["pos"] = self.ip_mgr.merge_subject_refs_into_text(name, emb["pos_raw"], agg="mean")
+
 
                     # CFG Calculation
                     if emb["neg"] is not None and emb["added_neg"] is not None:
