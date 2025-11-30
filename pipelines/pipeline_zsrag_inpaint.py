@@ -337,9 +337,12 @@ class ZSRAGPipeline:
                     base_ip_weight=1.0
                 )
                 
-                # Apply suggestions
+                # Apply suggestions with HARD CAP on ip_weight
                 for name, sug in suggestions.items():
+                    if "ip_weight" in sug:
+                        sug["ip_weight"] = min(sug["ip_weight"], 1.0) # 封顶 1.0
                     per_subject_cfg[name].update(sug)
+
                 
                 print(f"[ZS-RAG] Iter {iter_idx} CLIP suggestions: {per_subject_cfg}")
 
