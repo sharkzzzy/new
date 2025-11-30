@@ -219,29 +219,32 @@ class DynamicMaskManager:
         eps_bg: torch.Tensor, 
         eps_subjects: Dict[str, torch.Tensor], 
         kappa: float = 1.0,
-        s_max: float = 0.6 # 【新增】总量上限
+        s_max: float = 0.6
     ) -> torch.Tensor:
         weights, w_bg = self.build_latent_fusion_weights()
-        def smooth_w(w): return _feather(w, radius=3).clamp(0.0, 1.0) # latent scale radius
+        
+        # 使用配置的半径，而不是硬编码 3
+        r = max(1, self.feather_radius_lat)
+        def smooth_w(w): 
+            return _feather(w, radius=r).clamp(0.0, 1.0)
 
         eps_final = eps_bg.clone()
         
-        # 计算所有主体的总权重图
+        # Calculate total subject weight per pixel
         total_w = torch.zeros_like(w_bg)
         for name in eps_subjects:
             total_w += smooth_w(weights[name])
             
-        # 如果某像素总权重 > s_max，进行全局缩放
-        # scale_factor = s_max / total_w (if total_w > s_max)
+        # Global scaling if total weight exceeds s_max
         scale_factor = (s_max / (total_w + 1e-6)).clamp(max=1.0)
         
         for name, eps_s in eps_subjects.items():
             w = smooth_w(weights[name])
-            # 应用缩放后的权重
             effective_w = w * scale_factor * kappa
             eps_final = eps_final + effective_w * (eps_s - eps_bg)
             
         return eps_final
+  
  
     # -----------------------
     # Internal Logic
