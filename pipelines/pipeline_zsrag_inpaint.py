@@ -328,20 +328,37 @@ class ZSRAGPipeline:
             timesteps_all = scheduler.timesteps
             
             if init_image is not None:
+                # 1. Calculate start step
                 start_step_idx = int(len(timesteps_all) * (1 - start_strength))
                 start_step_idx = max(0, min(start_step_idx, len(timesteps_all) - 1))
                 
-                # SDEdit: Manual Noise Addition via Sigma
+                # 2. Slice Timesteps
+                timesteps = timesteps_all[start_step_idx:]
+                
+                # 3. Get Sigma (Direct Access)
+                # EulerDiscreteScheduler stores sigmas corresponding to steps
+                # Ensure sigma is on correct device
                 sigma = scheduler.sigmas[start_step_idx].to(latents_base.device)
                 
-                noise = torch.randn_like(latents_base)
+                # 4. Generate Noise
                 if seed is not None:
+                    # Deterministic noise per iteration
                     gen = torch.Generator(device=self.device).manual_seed(seed + iter_idx)
-                    noise = torch.randn_like(latents_base, generator=gen)
+                    # Use randn instead of randn_like to support generator
+                    noise = torch.randn(
+                        latents_base.shape, 
+                        device=latents_base.device, 
+                        dtype=latents_base.dtype, 
+                        generator=gen
+                    )
+                else:
+                    noise = torch.randn_like(latents_base)
                 
+                # 5. Add Noise (SDEdit Formula: x_t = x_0 + sigma * eps)
                 latents_iter = latents_base + noise * sigma
-                timesteps = timesteps_all[start_step_idx:]
+                
             else:
+                # Text-to-Image Mode
                 timesteps = timesteps_all
                 latents_iter = latents_base.clone()
 
