@@ -282,22 +282,22 @@ class ZSRAGPipeline:
         width: int,
         height: int,
         mask_mgr: DynamicMaskManager,
-        # 新增/调整参数
-        init_image: Optional[Image.Image] = None, # Stage A 的输出
-        start_strength: float = 0.6,              # SDEdit 起始强度 (0.6 保留 40% 原图结构)
-        delay_gate_step: int = 8,                 # 前8步不开启 Cross-Attn 门控
-        
+        # 新增参数
+        init_image: Optional[Image.Image] = None, 
+        start_strength: float = 0.6,
+        delay_gate_step: int = 8,
+        # 原有参数
         num_inference_steps: int = 40,
         cfg_pos: float = 7.5,
         cfg_neg: float = 3.0,
-        kappa: float = 1.0,                       # 基础 Kappa，内部会有分段调度
+        kappa: float = 1.0,
         seed: int = 42,
         iter_clip: int = 2,
         clip_threshold: float = 0.32,
         probe_interval: int = 5,
     ) -> Dict[str, Any]:
         """
-        Stage C: Attribute Binding Loop (Refined Logic).
+        Stage C: Attribute Binding Loop with Strict SDEdit Logic.
         """
         seed_everything(seed)
         H_lat, W_lat = get_base_latent_size(width, height, downsample=8)
@@ -305,40 +305,47 @@ class ZSRAGPipeline:
 
         scheduler = self.pipe.scheduler
         
-        # 1. Latent Initialization (SDEdit Strategy)
-        # 使用 Stage A 的图作为基底，避免从纯噪声凭空造背景
-        latents, _ = prepare_latents(
+        # 1. Prepare Base Latents (Clean if init_image, else Noise)
+        # util function now just encodes, doesn't add SDEdit noise
+        latents_base = prepare_latents(
             1, 4, H_lat, W_lat, self.pipe.unet.dtype, self.device, scheduler, 
-            seed=seed, vae=self.pipe.vae, init_image=init_image, strength=start_strength
+            seed=seed, vae=self.pipe.vae, init_image=init_image
         )
 
-        # Global Embeds
+        # Global Embeds & Subject Embeds (Same as before)
         ge_pos, ge_uncond, ge_pp, ge_np = encode_prompt_sdxl(self.pipe, global_prompt, "")
         added_global_pos = build_added_kwargs_sdxl(ge_pp, torch.tensor([[height, width, 0, 0, height, width]], dtype=torch.float32, device=self.device))
         added_global_uncond = build_added_kwargs_sdxl(ge_np, torch.tensor([[height, width, 0, 0, height, width]], dtype=torch.float32, device=self.device))
-
-        # Subject Embeds (Initial)
-        # 注意：这里我们只准备文本，IP-Adapter 的 image token 会在循环内动态 merge
         embs_sub = self._prepare_subject_embeddings(width, height, subjects, add_ip_refs=True)
         self.attn_proc.set_key_agg_mode("mean")
-
-        # Per-Subject Config
         per_subject_cfg = {s["name"]: {"cfg_pos": float(cfg_pos), "cfg_neg": float(cfg_neg), "ip_weight": float(s.get("ip_weight", 1.0))} for s in subjects}
 
         image_out = None
         
         # --- Iteration Loop ---
         for iter_idx in range(max(1, int(iter_clip) + 1)):
-            
-            # A. Scheduler Reset & Timestep Slicing (SDEdit)
-            # 先获取完整 timesteps，然后截取后半段
             scheduler.set_timesteps(num_inference_steps, device=self.device)
             timesteps_all = scheduler.timesteps
-            # 根据 strength 截取：例如 strength=0.6，取最后 60% 的步数
-            start_step_idx = int(len(timesteps_all) * (1 - start_strength))
-            timesteps = timesteps_all[start_step_idx:]
             
-            # B. CLIP Feedback Adjustment
+            if init_image is not None:
+                start_step_idx = int(len(timesteps_all) * (1 - start_strength))
+                start_step_idx = max(0, min(start_step_idx, len(timesteps_all) - 1))
+                
+                # SDEdit: Manual Noise Addition via Sigma
+                sigma = scheduler.sigmas[start_step_idx].to(latents_base.device)
+                
+                noise = torch.randn_like(latents_base)
+                if seed is not None:
+                    gen = torch.Generator(device=self.device).manual_seed(seed + iter_idx)
+                    noise = torch.randn_like(latents_base, generator=gen)
+                
+                latents_iter = latents_base + noise * sigma
+                timesteps = timesteps_all[start_step_idx:]
+            else:
+                timesteps = timesteps_all
+                latents_iter = latents_base.clone()
+
+            # B. CLIP Feedback (Same as before)
             if iter_idx > 0 and image_out is not None:
                 masks_img = mask_mgr.get_masks_img()
                 eval_result, suggestions = evaluate_and_suggest(
@@ -351,26 +358,20 @@ class ZSRAGPipeline:
                     base_cfg_neg=cfg_neg, 
                     base_ip_weight=1.0
                 )
-                # Apply suggestions
                 for name, sug in suggestions.items():
                     per_subject_cfg[name].update(sug)
                 print(f"[ZS-RAG] Iter {iter_idx} CLIP suggestions: {per_subject_cfg}")
 
-            # C. Latent Reset
-            latents_iter = latents.clone() 
-            
             # --- Diffusion Loop ---
             for step_rel_idx, t in enumerate(timesteps):
-                # 真实的 step index (从 0 开始计数，用于 Layer 调度)
-                # 但对于 SDEdit，我们是在去噪过程的中途，attn_proc 应该知道这是第几步吗？
-                # AlphaScheduler通常看整体进度。这里简单用相对进度。
-                # 也可以用 absolute_step = start_step_idx + step_rel_idx
+                # NOTE: For SDEdit, we are technically at step (start_step_idx + step_rel_idx)
+                # But attn_proc scheduler usually just needs 0..1 progress. 
+                # passing step_rel_idx and len(timesteps) is fine for relative progress.
                 self.attn_proc.set_step_index(step_rel_idx, len(timesteps))
                 
                 latent_model_input = scheduler.scale_model_input(latents_iter, t)
 
                 # D. Phase A: Background Recording
-                # 仅在关键节点更新背景结构，减少计算
                 if step_rel_idx % 3 == 0:
                     self.context_bank.clear()
                     self.attn_proc.set_mode("record_bg")
@@ -383,7 +384,7 @@ class ZSRAGPipeline:
                         probe=False, region_mask=None, subject_id=None
                     )
 
-                # E. Phase B: Background Prediction (Ungated)
+                # E. Phase B: Background Prediction
                 eps_bg = compute_cfg_raca(
                     self.pipe.unet, latent_model_input, t,
                     emb_pos=ge_pos, emb_uncond=ge_uncond,
@@ -391,7 +392,7 @@ class ZSRAGPipeline:
                     added_cond_kwargs_uncond=added_global_uncond,
                     attn_proc=self.attn_proc,
                     cfg_pos=float(cfg_pos),
-                    gate_uncond=False, gate_pos=False, # Background is global base
+                    gate_uncond=False, gate_pos=False, 
                     mode_uncond="off", mode_pos="off",
                 )
 
@@ -401,50 +402,46 @@ class ZSRAGPipeline:
                 do_probe = (step_rel_idx % max(1, int(probe_interval)) == 0)
                 self.attn_proc.set_probe_enabled(do_probe)
 
-                # 策略控制：延迟门控 & Kappa 分段
-                # 前几步不门控，让背景充分形成
                 is_early_stage = step_rel_idx < delay_gate_step
                 gate_pos_curr = False if is_early_stage else True
                 
-                # Kappa 调度：前期弱，后期强
-                # 假设总步数 25 (strength 0.6 * 40)
+                # Probe Logic: Disable in early stage
+                do_probe = (step_rel_idx % max(1, int(probe_interval)) == 0) and (not is_early_stage)
+                self.attn_proc.set_probe_enabled(do_probe)
+                
+                # Kappa 调度
                 if step_rel_idx < 8: kappa_curr = 0.6
                 elif step_rel_idx < 18: kappa_curr = 0.9
                 else: kappa_curr = 1.1
-                # 乘以基础 kappa
                 kappa_curr *= float(kappa)
 
                 for subj_idx, s in enumerate(subjects):
                     name = s["name"]
                     emb = embs_sub[name]
-                    
                     self.attn_proc.set_region_mask(masks_latent_gate[name])
                     self.attn_proc.set_subject_id(subj_idx)
 
-                    # Dynamic IP-Adapter Weight Update (Staged Strategy)
-                    # 第一轮(iter=0) 禁用或弱化 IP-Adapter，保结构
-                    # 第二轮(iter>0) 允许开启，且受 CLIP 建议控制，但封顶
+                    # IP-Adapter 分阶段策略
                     target_ip_w = float(per_subject_cfg[name]["ip_weight"])
                     if iter_idx == 0:
-                        current_ip_w = 0.0 # 第一轮完全关闭 IP-Adapter，只靠 Text 和 SDEdit 保背景
+                        current_ip_w = 0.0 # 第一轮关，保结构
                     else:
-                        current_ip_w = min(target_ip_w, 1.0) # 封顶 1.0
+                        current_ip_w = min(target_ip_w, 1.0)
 
-                    # 实时更新 Embeddings (使用 pos_raw 避免累积)
+                    # Update embeddings using raw text base
                     ref_image = s.get("ref_image", None)
                     if ref_image is None:
                         color_rgb = parse_color_from_text(s["prompt"])
                         if color_rgb: ref_image = make_color_patch(color_rgb)
                     
-                    # 只有当权重 > 0 时才注入
                     if ref_image is not None and current_ip_w > 0.01:
                         self.ip_mgr.clear()
                         self.ip_mgr.add_reference(name, ref_image, weight=current_ip_w)
                         emb["pos"] = self.ip_mgr.merge_subject_refs_into_text(name, emb["pos_raw"], agg="mean")
                     else:
-                        emb["pos"] = emb["pos_raw"] # 回退到纯文本
+                        emb["pos"] = emb["pos_raw"]
 
-                    # CFG Calculation (Contrastive)
+                    # CFG
                     if emb["neg"] is not None and emb["added_neg"] is not None:
                         eps_sub = compute_contrastive_cfg_raca(
                             self.pipe.unet, latent_model_input, t,
@@ -458,7 +455,7 @@ class ZSRAGPipeline:
                             subject_id=subj_idx,
                             probe_pos=do_probe,
                             gate_uncond=False, 
-                            gate_pos=gate_pos_curr, # 延迟门控策略
+                            gate_pos=gate_pos_curr,
                             gate_neg=gate_pos_curr,
                             mode_uncond="off", mode_pos="inject_subject", mode_neg="inject_subject",
                         )
@@ -481,14 +478,13 @@ class ZSRAGPipeline:
                 self.attn_proc.set_probe_enabled(False)
                 self.attn_proc.set_region_mask(None)
 
-                # G. Latent Blending (Energy Minimized)
-                # 传入 s_max=0.6 限制主体冲击力
+                # G. Latent Blending
                 eps_final = mask_mgr.energy_minimize_blend(eps_bg, eps_subjects, kappa=kappa_curr, s_max=0.6)
 
                 # H. Step
                 latents_iter = scheduler.step(eps_final, t, latents_iter).prev_sample
 
-                # I. Mask Update (Probing)
+                # I. Mask Update
                 if do_probe:
                     attn_maps = self.attn_proc.pop_attn_maps()
                     maps_img = {}
@@ -496,14 +492,13 @@ class ZSRAGPipeline:
                         name = subjects[sid]["name"]
                         maps_img[name] = F.interpolate(amap, size=(height, width), mode="bilinear", align_corners=False)
                     if maps_img:
-                        # 稍微收紧腐蚀，避免掩码过度膨胀
                         mask_mgr.update_from_attn(maps_img, beta=0.5, thresh=0.55, erode_k=7, blur_ksize=15, blur_sigma=2.5)
 
-            # Decode
             image_out = decode_vae(self.pipe.vae, latents_iter)
             final_latents = latents_iter.clone()
 
         return {"image": image_out, "latents": final_latents, "masks_img": mask_mgr.get_masks_img()}
+   
 
 
 
@@ -670,13 +665,16 @@ def run_zsrag(
         safety_expand=safety_expand, tau=tau, bg_floor=bg_floor, gap_ratio=gap_ratio,
         feather_radius_img=15, feather_radius_lat=3
     )
-
-    # Stage C
     bind = pipeline.bind_attributes(
         global_prompt=global_prompt, subjects=subjects, width=width, height=height, 
         mask_mgr=mask_mgr, num_inference_steps=num_inference_steps, 
         cfg_pos=cfg_pos, cfg_neg=cfg_neg, kappa=kappa, seed=seed, 
-        iter_clip=iter_clip, clip_threshold=clip_threshold, probe_interval=probe_interval
+        iter_clip=iter_clip, clip_threshold=clip_threshold, probe_interval=probe_interval,
+        
+        # 【关键修改】传入 Stage A 结果
+        init_image=boot["image"], 
+        start_strength=0.6,
+        delay_gate_step=8
     )
     if save_dir:
         save_image_tensor(bind["image"], os.path.join(save_dir, "stageC_bind.png"))
