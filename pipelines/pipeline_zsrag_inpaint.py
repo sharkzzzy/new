@@ -485,52 +485,67 @@ class ZSRAGPipeline:
         Stage D: SDEdit with ControlNet.
         """
         # =========================================================
-        # 显存大清洗 (针对 FP32 用户必须执行)
+        # 激进显存清理：彻底销毁 Stage C 的模型
         # =========================================================
-        print("[ZS-RAG] Moving Stage C models to CPU to free VRAM for ControlNet...")
+        print("[ZS-RAG] Destroying Stage C models to free VRAM for ControlNet...")
         
-        # 1. 卸载 Base Pipeline 组件
-        self.pipe.unet.to("cpu")
-        self.pipe.vae.to("cpu")
-        self.pipe.text_encoder.to("cpu")
-        self.pipe.text_encoder_2.to("cpu")
-        
-        # 2. 卸载 IP-Adapter
-        self.ip_adapter.clip_image_encoder.to("cpu")
-        self.ip_adapter.resampler.to("cpu") # 如果有的话
-        
-        # 3. 卸载 CLIP Evaluator
-        self.clip_eval.model.to("cpu")
-        
-        # 4. 清理缓存
+        # 1. 移动到 CPU 并删除引用
+        if hasattr(self, "pipe"):
+            self.pipe.unet.to("cpu")
+            self.pipe.vae.to("cpu")
+            self.pipe.text_encoder.to("cpu")
+            self.pipe.text_encoder_2.to("cpu")
+            del self.pipe.unet
+            del self.pipe.vae
+            del self.pipe.text_encoder
+            del self.pipe.text_encoder_2
+            del self.pipe
+            self.pipe = None # 标记为 None
+
+        if hasattr(self, "ip_adapter"):
+            self.ip_adapter.clip_image_encoder.to("cpu")
+            if hasattr(self.ip_adapter, "resampler"):
+                self.ip_adapter.resampler.to("cpu")
+            if hasattr(self.ip_adapter, "image_proj"):
+                self.ip_adapter.image_proj.to("cpu")
+            del self.ip_adapter
+            self.ip_adapter = None
+
+        if hasattr(self, "clip_eval"):
+            self.clip_eval.model.to("cpu")
+            del self.clip_eval
+            self.clip_eval = None
+            
+        # 2. 强制 Python 垃圾回收
+        import gc
+        gc.collect()
         torch.cuda.empty_cache()
         # =========================================================
 
-        # Lazy Load ControlNets (以下代码保持不变)
+        # Lazy Load ControlNets
         if self.cn_builder is None:
             controlnets = {}
-            # Using SDXL compatible ControlNets (e.g., Canny/Depth)
             if control_lineart is not None:
                 controlnets.update(load_controlnets(
-                    canny_model_id="diffusers/controlnet-canny-sdxl-1.0", # Used for lineart structure
+                    canny_model_id="diffusers/controlnet-canny-sdxl-1.0",
                     depth_model_id=None, 
-                    device=self.device, torch_dtype=self.pipe.unet.dtype
+                    device=self.device, torch_dtype=self.dtype # 注意这里用 self.dtype
                 ))
             if control_depth is not None:
                 controlnets.update(load_controlnets(
                     canny_model_id=None,
                     depth_model_id="diffusers/controlnet-depth-sdxl-1.0", 
-                    device=self.device, torch_dtype=self.pipe.unet.dtype
+                    device=self.device, torch_dtype=self.dtype
                 ))
             
             if len(controlnets) == 0:
-                # Fallback: No ControlNet, just return input (or run naive img2img)
                 return init_image if isinstance(init_image, Image.Image) else None
-                
+            
+            # 注意：这里我们重新指定 dtype，确保 Inpaint Pipe 也是 FP32 (如果 self.dtype 是 float32)
             self.cn_builder = SDXLControlNetBuilder(
                 base_model_id="stabilityai/stable-diffusion-xl-base-1.0", 
                 device=self.device, 
-                torch_dtype=self.pipe.unet.dtype, 
+                torch_dtype=self.dtype, # 使用初始化时的 dtype (FP32)
                 controlnets=controlnets
             )
 
@@ -538,9 +553,6 @@ class ZSRAGPipeline:
 
         # Pack Control Images
         pack = ControlImagePack(target_size=(width, height))
-        # Note: Order must match keys in cn_builder. 
-        # Since we use 'canny' and 'depth' keys, we add them accordingly.
-        # Check builder keys order
         for key in self.cn_builder.controlnet_keys:
             if key == "canny" and control_lineart is not None:
                 pack.add("canny", control_lineart)
@@ -558,6 +570,7 @@ class ZSRAGPipeline:
             seed=seed,
         )
         return img_sde
+
 
 
 # ---------------------------------
