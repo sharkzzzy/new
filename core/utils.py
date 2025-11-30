@@ -189,17 +189,14 @@ def prepare_latents(
     width_lat: int,
     dtype: torch.dtype,
     device: torch.device,
-    scheduler,
+    scheduler, # 保留参数位，但如果 init_image 存在则不用来加噪
     seed: Optional[int] = None,
-    # 新增参数 (SDEdit Support)
     vae=None,
-    init_image=None, # PIL or Tensor [0..1]
-    strength: float = 1.0, # 1.0 = pure noise, <1.0 = img2img
-) -> Tuple[torch.Tensor, torch.Tensor]: # Return (latents, timesteps_indices if needed, or None)
+    init_image=None,
+) -> torch.Tensor:
     """
-    Initializes latents. 
-    If init_image is provided, encodes it and adds noise (SDEdit).
-    Returns: (latents, None) - timesteps handling is done by caller via slicing.
+    Returns clean latents (if init_image) OR random scaled noise (if no init_image).
+    Does NOT handle SDEdit noise addition logic.
     """
     gen = None
     if seed is not None:
@@ -207,61 +204,32 @@ def prepare_latents(
         
     shape = (batch_size, channels, height_lat, width_lat)
     
-    # 1. Base Noise
-    noise = torch.randn(shape, device=device, dtype=dtype, generator=gen)
-    
-    # 2. Text-to-Image Mode (No Init Image)
-    if init_image is None or vae is None or strength >= 1.0:
-        # Scale noise by sigma (EulerDiscrete usually needs sigma_max or 1.0 depending on config)
-        # Standard diffusers pipe: latents = noise * scheduler.init_noise_sigma
-        latents = noise * scheduler.init_noise_sigma
-        return latents, None
+    # 1. Pure Noise (Text-to-Image mode base)
+    if init_image is None or vae is None:
+        noise = torch.randn(shape, device=device, dtype=dtype, generator=gen)
+        return noise * scheduler.init_noise_sigma
 
-    # 3. Image-to-Image Mode (SDEdit)
-    # Preprocess Image -> Tensor [B, C, H, W] (-1..1 range for VAE)
+    # 2. Image-to-Image: Encode to Clean Latent
     from zsrag.core.utils import pil_to_tensor_uint8, tensor_to_float01
     
     if not isinstance(init_image, torch.Tensor):
-        # PIL -> Tensor
         img_t = pil_to_tensor_uint8(init_image)
         img_t = tensor_to_float01(img_t).unsqueeze(0).to(device=device, dtype=vae.dtype)
     else:
-        # Tensor -> Tensor
         img_t = init_image.to(device=device, dtype=vae.dtype)
         if img_t.ndim == 3: img_t = img_t.unsqueeze(0)
     
-    # Map [0,1] -> [-1,1]
     img_t = (img_t * 2.0) - 1.0
     
-    # Encode VAE
     with torch.no_grad():
         if hasattr(vae.config, "shift_factor") and vae.config.shift_factor is not None:
-             # SDXL VAE scaling
              latents_clean = vae.encode(img_t).latent_dist.sample(generator=gen)
              latents_clean = (latents_clean - vae.config.shift_factor) * vae.config.scaling_factor
         else:
-             # Standard SD VAE
              latents_clean = vae.encode(img_t).latent_dist.sample(generator=gen) * vae.config.scaling_factor
     
-    latents_clean = latents_clean.to(dtype=dtype)
-    
-    # Add Noise
-    # Get timestep for strength
-    # Note: scheduler.timesteps must be set by caller BEFORE this if using add_noise with timestep tensor
-    # But usually add_noise takes (original, noise, timestep).
-    # We need to map strength (0..1) to timestep index/value.
-    
-    # Heuristic: num_train_timesteps usually 1000.
-    init_timestep = int(scheduler.config.num_train_timesteps * strength)
-    init_timestep = min(init_timestep, scheduler.config.num_train_timesteps - 1)
-    
-    # Create timestep tensor
-    timesteps = torch.tensor([init_timestep], device=device, dtype=torch.long)
-    
-    # Add noise
-    latents = scheduler.add_noise(latents_clean, noise, timesteps)
-    
-    return latents, None
+    return latents_clean.to(dtype=dtype)
+
 
 @torch.no_grad()
 def decode_vae(vae, latents: torch.Tensor) -> torch.Tensor:
