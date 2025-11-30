@@ -1,4 +1,4 @@
-torch2.4_cuda11.8) linux@ubuntu-0965:~/Downloads/new-main(1)$ /home/linux/anaconda3/envs/torch2.4_cuda11.8/bin/python "/home/linux/Downloads/new-main(1)/tests/demo_zsrag.py"
+(torch2.4_cuda11.8) linux@ubuntu-0965:~/Downloads/new-main(1)$ /home/linux/anaconda3/envs/torch2.4_cuda11.8/bin/python "/home/linux/Downloads/new-main(1)/tests/demo_zsrag.py"
 /home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/controlnet_aux/mediapipe_face/mediapipe_face_common.py:7: UserWarning: The module 'mediapipe' is not installed. The package will have limited functionality. Please install it using the command: pip install 'mediapipe'
   warnings.warn(
 /home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/timm/models/layers/__init__.py:48: FutureWarning: Importing from timm.models.layers is deprecated, please import via timm.layers
@@ -16,8 +16,8 @@ torch2.4_cuda11.8) linux@ubuntu-0965:~/Downloads/new-main(1)$ /home/linux/anacon
 /home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/controlnet_aux/segment_anything/modeling/tiny_vit_sam.py:654: UserWarning: Overwriting tiny_vit_21m_512 in registry with controlnet_aux.segment_anything.modeling.tiny_vit_sam.tiny_vit_21m_512. This is because the name being registered conflicts with an existing name. Please check if this is not expected.
   return register_model(fn_wrapper)
 Loading Pipeline...
-Loading pipeline components...:   0%|                                                                                                                   | 0/7 [00:00<?, ?it/s]`torch_dtype` is deprecated! Use `dtype` instead!
-Loading pipeline components...: 100%|███████████████████████████████████████████████████████████████████████████████████████████████████████████| 7/7 [00:10<00:00,  1.44s/it]
+Loading pipeline components...:  71%|████████████████████████████████████████████████████████████████████████████▍                              | 5/7 [00:07<00:03,  1.68s/it]`torch_dtype` is deprecated! Use `dtype` instead!
+Loading pipeline components...: 100%|███████████████████████████████████████████████████████████████████████████████████████████████████████████| 7/7 [00:10<00:00,  1.50s/it]
 Using a slow image processor as `use_fast` is unset and a slow processor was saved with this model. `use_fast=True` will be the default behavior in v4.52, even if the model was saved with a slow processor. This will result in minor differences in outputs. You'll still be able to use a slow processor with `use_fast=False`.
 [IPAdapterXL] Loading Image Encoder: openai/clip-vit-large-patch14...
 [IPAdapterXL] Downloading weights from h94/IP-Adapter/sdxl_models/ip-adapter_sdxl.bin...
@@ -25,14 +25,17 @@ Using a slow image processor as `use_fast` is unset and a slow processor was sav
   sd = torch.load(path, map_location="cpu")
 [IPAdapterXL] Resampler weights loaded successfully.
 Running ZS-RAG...
-100%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 20/20 [00:14<00:00,  1.41it/s]
+100%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 20/20 [00:06<00:00,  3.01it/s]
 /home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/controlnet_aux/lineart/__init__.py:112: FutureWarning: You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.
   model.load_state_dict(torch.load(model_path, map_location=torch.device('cpu')))
 /home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/controlnet_aux/lineart/__init__.py:116: FutureWarning: You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.
   coarse_model.load_state_dict(torch.load(coarse_model_path, map_location=torch.device('cpu')))
 /home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/controlnet_aux/zoe/__init__.py:34: FutureWarning: You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.
   state_dict = torch.load(model_path, map_location=torch.device('cpu'))['model']
-[ZS-RAG] Iter 1 CLIP suggestions: {'cat': {'cfg_pos': 7.642732753753662, 'cfg_neg': 3.071366376876831, 'ip_weight': 1.1427327537536622}, 'dog': {'cfg_pos': 7.718736096620559, 'cfg_neg': 3.1093680483102797, 'ip_weight': 1.2187360966205598}}
+[ZS-RAG] Iter 1 CLIP suggestions: {'cat': {'cfg_pos': 7.683528378009796, 'cfg_neg': 3.091764189004898, 'ip_weight': 1.1835283780097963}, 'dog': {'cfg_pos': 7.722515180110931, 'cfg_neg': 3.1112575900554655, 'ip_weight': 1.2225151801109315}}
+[ZS-RAG] Iter 2 CLIP suggestions: {'cat': {'cfg_pos': 7.692764236927032, 'cfg_neg': 3.096382118463516, 'ip_weight': 1.1927642369270326}, 'dog': {'cfg_pos': 7.764947965145111, 'cfg_neg': 3.1324739825725554, 'ip_weight': 1.2649479651451112}}
+Warning: Failed to load Depth ControlNet: CUDA out of memory. Tried to allocate 20.00 MiB. GPU 0 has a total capacity of 21.66 GiB of which 5.94 MiB is free. Including non-PyTorch memory, this process has 21.65 GiB memory in use. Of the allocated memory 21.09 GiB is allocated by PyTorch, and 382.73 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+Loading pipeline components...: 100%|███████████████████████████████████████████████████████████████████████████████████████████████████████████| 7/7 [00:01<00:00,  4.50it/s]
 Traceback (most recent call last):
   File "/home/linux/Downloads/new-main(1)/tests/demo_zsrag.py", line 72, in <module>
     main()
@@ -40,12 +43,28 @@ Traceback (most recent call last):
     result = run_zsrag(
   File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/torch/utils/_contextlib.py", line 116, in decorate_context
     return func(*args, **kwargs)
-  File "/home/linux/Downloads/new-main(1)/zsrag/pipelines/pipeline_zsrag_inpaint.py", line 602, in run_zsrag
-    bind = pipeline.bind_attributes(
-  File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/torch/utils/_contextlib.py", line 116, in decorate_context
-    return func(*args, **kwargs)
-  File "/home/linux/Downloads/new-main(1)/zsrag/pipelines/pipeline_zsrag_inpaint.py", line 454, in bind_attributes
-    latents_iter = scheduler.step(eps_final, t, latents_iter).prev_sample
-  File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/diffusers/schedulers/scheduling_euler_discrete.py", line 668, in step
-    dt = self.sigmas[self.step_index + 1] - sigma_hat
-IndexError: index 41 is out of bounds for dimension 0 with size 41
+  File "/home/linux/Downloads/new-main(1)/zsrag/pipelines/pipeline_zsrag_inpaint.py", line 608, in run_zsrag
+    img_harmonized = pipeline.harmonize_global(
+  File "/home/linux/Downloads/new-main(1)/zsrag/pipelines/pipeline_zsrag_inpaint.py", line 515, in harmonize_global
+    pipe_inpaint = self.cn_builder.get_inpaint_pipeline()
+  File "/home/linux/Downloads/new-main(1)/zsrag/core/controlnet_utils.py", line 189, in get_inpaint_pipeline
+    return self.build_inpaint_pipeline()
+  File "/home/linux/Downloads/new-main(1)/zsrag/core/controlnet_utils.py", line 176, in build_inpaint_pipeline
+    ).to(self.device)
+  File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/diffusers/pipelines/pipeline_utils.py", line 541, in to
+    module.to(device, dtype)
+  File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/transformers/modeling_utils.py", line 4343, in to
+    return super().to(*args, **kwargs)
+  File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1174, in to
+    return self._apply(convert)
+  File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/torch/nn/modules/module.py", line 780, in _apply
+    module._apply(fn)
+  File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/torch/nn/modules/module.py", line 780, in _apply
+    module._apply(fn)
+  File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/torch/nn/modules/module.py", line 780, in _apply
+    module._apply(fn)
+  File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/torch/nn/modules/module.py", line 805, in _apply
+    param_applied = fn(param)
+  File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1160, in convert
+    return t.to(
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 146.00 MiB. GPU 0 has a total capacity of 21.66 GiB of which 107.94 MiB is free. Including non-PyTorch memory, this process has 21.55 GiB memory in use. Of the allocated memory 20.96 GiB is allocated by PyTorch, and 408.18 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
