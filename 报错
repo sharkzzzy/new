@@ -1,7 +1,11 @@
-[ZS-RAG] Destroying Stage C models to free VRAM for ControlNet...
-Fetching 19 files:   0%|                                                                                                                               | 0/19 [00:00<?, ?it/s]
-diffusion_pytorch_model.fp16.safetensors:   6%|█████▊                                                                                      | 10.5M/167M [00:19<04:57, 528kB/s]
-model.fp16.safetensors:   1%|▊                                                                                                            | 10.5M/1.39G [00:20<44:16, 519kB/s]
-diffusion_pytorch_model.fp16.safetensors:   6%|█████▊                                                                                      | 10.5M/167M [00:19<04:58, 526kB/s]
-diffusion_pytorch_model.fp16.safetensors:   0%|▏                                                                                        | 10.5M/5.14G [00:20<2:43:53, 521kB/s]
-model.fp16.safetensors:   4%|████▋                                                                                                         | 10.5M/246M [00:20<07:34, 519
+(base) linux@ubuntu-0965:~$ cd ~/.cache/huggingface/hub/
+(base) linux@ubuntu-0965:~/.cache/huggingface/hub$ ls -lh
+total 28K
+drwxrwxr-x 6 linux linux 4.0K 11月 30 04:53 models--diffusers--controlnet-canny-sdxl-1.0
+drwxrwxr-x 6 linux linux 4.0K 11月 30 05:18 models--diffusers--controlnet-depth-sdxl-1.0
+drwxrwxr-x 6 linux linux 4.0K 11月 30 03:52 models--h94--IP-Adapter
+drwxrwxr-x 6 linux linux 4.0K 11月 30 03:08 models--laion--CLIP-ViT-bigG-14-laion2B-39B-b160k
+drwxrwxr-x 5 linux linux 4.0K 11月 30 01:55 models--lllyasviel--Annotators
+drwxrwxr-x 6 linux linux 4.0K 11月 30 01:26 models--openai--clip-vit-large-patch14
+drwxrwxr-x 5 linux linux 4.0K 11月 30 15:10 models--stabilityai--stable-diffusion-xl-base-1.0
+(base) linux@ubuntu-0965:~/.cache/huggingface/hub$ 
