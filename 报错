@@ -1,1 +1,87 @@
-os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
+diffusion_pytorch_model.fp16.safetensors:  21%|██████████████████▎                                                                      | 1.06G/5.14G [26:42<1:42:48, 661kB/s]
+model.fp16.safetensors: 100%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████| 1.39G/1.39G [31:36<00:00, 732kB/s]
+Fetching 19 files:  79%|████████████████████████████████████████████████████████████████████████████████████████████▎                        | 15/19 [31:38<08:26, 126.54s/it]
+Traceback (most recent call last):
+  File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/urllib3/response.py", line 748, in _error_catcher
+    yield
+  File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/urllib3/response.py", line 894, in _raw_read
+    raise IncompleteRead(self._fp_bytes_read, self.length_remaining)
+urllib3.exceptions.IncompleteRead: IncompleteRead(1061244508 bytes read, 4073905252 more expected)
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/requests/models.py", line 820, in generate
+    yield from self.raw.stream(chunk_size, decode_content=True)
+  File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/urllib3/response.py", line 1060, in stream
+    data = self.read(amt=amt, decode_content=decode_content)
+  File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/urllib3/response.py", line 977, in read
+    data = self._raw_read(amt)
+  File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/urllib3/response.py", line 872, in _raw_read
+    with self._error_catcher():
+  File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/contextlib.py", line 153, in __exit__
+    self.gen.throw(typ, value, traceback)
+  File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/urllib3/response.py", line 772, in _error_catcher
+    raise ProtocolError(arg, e) from e
+urllib3.exceptions.ProtocolError: ('Connection broken: IncompleteRead(1061244508 bytes read, 4073905252 more expected)', IncompleteRead(1061244508 bytes read, 4073905252 more expected))
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/linux/Downloads/new-main(1)/tests/demo_zsrag.py", line 73, in <module>
+    main()
+  File "/home/linux/Downloads/new-main(1)/tests/demo_zsrag.py", line 41, in main
+    result = run_zsrag(
+  File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/torch/utils/_contextlib.py", line 116, in decorate_context
+    return func(*args, **kwargs)
+  File "/home/linux/Downloads/new-main(1)/zsrag/pipelines/pipeline_zsrag_inpaint.py", line 647, in run_zsrag
+    img_harmonized = pipeline.harmonize_global(
+  File "/home/linux/Downloads/new-main(1)/zsrag/pipelines/pipeline_zsrag_inpaint.py", line 556, in harmonize_global
+    pipe_inpaint = self.cn_builder.get_inpaint_pipeline()
+  File "/home/linux/Downloads/new-main(1)/zsrag/core/controlnet_utils.py", line 189, in get_inpaint_pipeline
+    return self.build_inpaint_pipeline()
+  File "/home/linux/Downloads/new-main(1)/zsrag/core/controlnet_utils.py", line 170, in build_inpaint_pipeline
+    self.pipe_inpaint = StableDiffusionXLControlNetInpaintPipeline.from_pretrained(
+  File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/huggingface_hub/utils/_validators.py", line 114, in _inner_fn
+    return fn(*args, **kwargs)
+  File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/diffusers/pipelines/pipeline_utils.py", line 833, in from_pretrained
+    cached_folder = cls.download(
+  File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/huggingface_hub/utils/_validators.py", line 114, in _inner_fn
+    return fn(*args, **kwargs)
+  File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/diffusers/pipelines/pipeline_utils.py", line 1632, in download
+    cached_folder = snapshot_download(
+  File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/huggingface_hub/utils/_validators.py", line 114, in _inner_fn
+    return fn(*args, **kwargs)
+  File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/huggingface_hub/_snapshot_download.py", line 332, in snapshot_download
+    thread_map(
+  File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/tqdm/contrib/concurrent.py", line 69, in thread_map
+    return _executor_map(ThreadPoolExecutor, fn, *iterables, **tqdm_kwargs)
+  File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/tqdm/contrib/concurrent.py", line 51, in _executor_map
+    return list(tqdm_class(ex.map(fn, *iterables, chunksize=chunksize), **kwargs))
+  File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/tqdm/std.py", line 1181, in __iter__
+    for obj in iterable:
+  File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/concurrent/futures/_base.py", line 621, in result_iterator
+    yield _result_or_cancel(fs.pop())
+  File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/concurrent/futures/_base.py", line 319, in _result_or_cancel
+    return fut.result(timeout)
+  File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/concurrent/futures/_base.py", line 451, in result
+    return self.__get_result()
+  File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/concurrent/futures/_base.py", line 403, in __get_result
+    raise self._exception
+  File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/concurrent/futures/thread.py", line 58, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/huggingface_hub/_snapshot_download.py", line 306, in _inner_hf_hub_download
+    return hf_hub_download(
+  File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/huggingface_hub/utils/_validators.py", line 114, in _inner_fn
+    return fn(*args, **kwargs)
+  File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/huggingface_hub/file_download.py", line 1007, in hf_hub_download
+    return _hf_hub_download_to_cache_dir(
+  File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/huggingface_hub/file_download.py", line 1168, in _hf_hub_download_to_cache_dir
+    _download_to_tmp_and_move(
+  File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/huggingface_hub/file_download.py", line 1735, in _download_to_tmp_and_move
+    http_get(
+  File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/huggingface_hub/file_download.py", line 493, in http_get
+    for chunk in r.iter_content(chunk_size=constants.DOWNLOAD_CHUNK_SIZE):
+  File "/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/requests/models.py", line 822, in generate
+    raise ChunkedEncodingError(e)
+requests.exceptions.ChunkedEncodingError: ('Connection broken: IncompleteRead(1061244508 bytes read, 4073905252 more expected)', IncompleteRead(1061244508 bytes read, 4073905252 more expected))
