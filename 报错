@@ -1,11 +1,1 @@
-(base) linux@ubuntu-0965:~$ cd ~/.cache/huggingface/hub/
-(base) linux@ubuntu-0965:~/.cache/huggingface/hub$ ls -lh
-total 28K
-drwxrwxr-x 6 linux linux 4.0K 11月 30 04:53 models--diffusers--controlnet-canny-sdxl-1.0
-drwxrwxr-x 6 linux linux 4.0K 11月 30 05:18 models--diffusers--controlnet-depth-sdxl-1.0
-drwxrwxr-x 6 linux linux 4.0K 11月 30 03:52 models--h94--IP-Adapter
-drwxrwxr-x 6 linux linux 4.0K 11月 30 03:08 models--laion--CLIP-ViT-bigG-14-laion2B-39B-b160k
-drwxrwxr-x 5 linux linux 4.0K 11月 30 01:55 models--lllyasviel--Annotators
-drwxrwxr-x 6 linux linux 4.0K 11月 30 01:26 models--openai--clip-vit-large-patch14
-drwxrwxr-x 5 linux linux 4.0K 11月 30 15:10 models--stabilityai--stable-diffusion-xl-base-1.0
-(base) linux@ubuntu-0965:~/.cache/huggingface/hub$ 
+os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
