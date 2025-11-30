@@ -83,10 +83,12 @@ class ZSRAGPipeline:
         raca_layer_patterns: Optional[List[str]] = None,
     ):
         self.device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.dtype = torch_dtype or torch.float16
+        if fp32_unet:
+            self.dtype = torch.float32
+        else:
+            self.dtype = torch_dtype or torch.float16
 
         # 1. Load SDXL base
-        # Enable VAE tiling/slicing for memory efficiency
         self.pipe = load_sdxl_base(
             model_id, 
             device=self.device, 
@@ -96,6 +98,7 @@ class ZSRAGPipeline:
         )
         if fp32_unet:
             force_fp32(self.pipe)
+
 
         # 2. Attach RACA Attention Processor
         self.context_bank = ContextBank()
