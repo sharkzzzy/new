@@ -1,3 +1,70 @@
+(torch2.4_cuda11.8) linux@ubuntu-0965:~/Downloads/new-main(1)$ /home/linux/anaconda3/envs/torch2.4_cuda11.8/bin/python "/home/linux/Downloads/new-main(1)/tests/demo_zsrag.py"
+/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/controlnet_aux/mediapipe_face/mediapipe_face_common.py:7: UserWarning: The module 'mediapipe' is not installed. The package will have limited functionality. Please install it using the command: pip install 'mediapipe'
+  warnings.warn(
+/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/timm/models/layers/__init__.py:48: FutureWarning: Importing from timm.models.layers is deprecated, please import via timm.layers
+  warnings.warn(f"Importing from {__name__} is deprecated, please import via timm.layers", FutureWarning)
+/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/timm/models/registry.py:4: FutureWarning: Importing from timm.models.registry is deprecated, please import via timm.models
+  warnings.warn(f"Importing from {__name__} is deprecated, please import via timm.models", FutureWarning)
+/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/controlnet_aux/segment_anything/modeling/tiny_vit_sam.py:654: UserWarning: Overwriting tiny_vit_5m_224 in registry with controlnet_aux.segment_anything.modeling.tiny_vit_sam.tiny_vit_5m_224. This is because the name being registered conflicts with an existing name. Please check if this is not expected.
+  return register_model(fn_wrapper)
+/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/controlnet_aux/segment_anything/modeling/tiny_vit_sam.py:654: UserWarning: Overwriting tiny_vit_11m_224 in registry with controlnet_aux.segment_anything.modeling.tiny_vit_sam.tiny_vit_11m_224. This is because the name being registered conflicts with an existing name. Please check if this is not expected.
+  return register_model(fn_wrapper)
+/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/controlnet_aux/segment_anything/modeling/tiny_vit_sam.py:654: UserWarning: Overwriting tiny_vit_21m_224 in registry with controlnet_aux.segment_anything.modeling.tiny_vit_sam.tiny_vit_21m_224. This is because the name being registered conflicts with an existing name. Please check if this is not expected.
+  return register_model(fn_wrapper)
+/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/controlnet_aux/segment_anything/modeling/tiny_vit_sam.py:654: UserWarning: Overwriting tiny_vit_21m_384 in registry with controlnet_aux.segment_anything.modeling.tiny_vit_sam.tiny_vit_21m_384. This is because the name being registered conflicts with an existing name. Please check if this is not expected.
+  return register_model(fn_wrapper)
+/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/controlnet_aux/segment_anything/modeling/tiny_vit_sam.py:654: UserWarning: Overwriting tiny_vit_21m_512 in registry with controlnet_aux.segment_anything.modeling.tiny_vit_sam.tiny_vit_21m_512. This is because the name being registered conflicts with an existing name. Please check if this is not expected.
+  return register_model(fn_wrapper)
+Loading Pipeline...
+Loading pipeline components...:  29%|██████████████████████████████▌                                                                            | 2/7 [00:00<00:00,  7.27it/s]`torch_dtype` is deprecated! Use `dtype` instead!
+Loading pipeline components...: 100%|███████████████████████████████████████████████████████████████████████████████████████████████████████████| 7/7 [00:19<00:00,  2.84s/it]
+Using a slow image processor as `use_fast` is unset and a slow processor was saved with this model. `use_fast=True` will be the default behavior in v4.52, even if the model was saved with a slow processor. This will result in minor differences in outputs. You'll still be able to use a slow processor with `use_fast=False`.
+[IPAdapterXL] Loading Image Encoder: openai/clip-vit-large-patch14...
+[IPAdapterXL] Downloading weights from h94/IP-Adapter/sdxl_models/ip-adapter_sdxl.bin...
+/home/linux/Downloads/new-main(1)/zsrag/core/ip_adapter_wrapper.py:202: FutureWarning: You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.
+  sd = torch.load(path, map_location="cpu")
+[IPAdapterXL] Resampler weights loaded successfully.
+Running ZS-RAG...
+100%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 20/20 [00:14<00:00,  1.38it/s]
+/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/controlnet_aux/lineart/__init__.py:112: FutureWarning: You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.
+  model.load_state_dict(torch.load(model_path, map_location=torch.device('cpu')))
+/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/controlnet_aux/lineart/__init__.py:116: FutureWarning: You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.
+  coarse_model.load_state_dict(torch.load(coarse_model_path, map_location=torch.device('cpu')))
+/home/linux/anaconda3/envs/torch2.4_cuda11.8/lib/python3.10/site-packages/controlnet_aux/zoe/__init__.py:34: FutureWarning: You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.
+  state_dict = torch.load(model_path, map_location=torch.device('cpu'))['model']
+[ZS-RAG] Iter 1 CLIP suggestions: {'cat': {'cfg_pos': 7.629292025566101, 'cfg_neg': 3.0646460127830504, 'ip_weight': 1.1292920255661012}, 'dog': {'cfg_pos': 7.867929204702377, 'cfg_neg': 3.1839646023511885, 'ip_weight': 1.3}}
+[ZS-RAG] Iter 2 CLIP suggestions: {'cat': {'cfg_pos': 7.590172126293182, 'cfg_neg': 3.045086063146591, 'ip_weight': 1.0901721262931825}, 'dog': {'cfg_pos': 7.885601117610931, 'cfg_neg': 3.1928005588054655, 'ip_weight': 1.3}}
+[ZS-RAG] Destroying Stage C models to free VRAM for ControlNet...
+diffusion_pytorch_model.fp16.safetensors: 100%|█████████████████████████████████████████████████████████████████████████████████████████| 5.14G/5.14G [2:42:42<00:00, 526kB/s]
+Fetching 19 files: 100%|███████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 19/19 [2:42:43<00:00, 513.86s/it]
+Loading pipeline components...: 100%|███████████████████████████████████████████████████████████████████████████████████████████████████████████| 7/7 [00:01<00:00,  3.86it/s]
+100%|███████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 6/6 [00:02<00:00,  2.49it/s]
+Done. Results saved in outputs_zsrag_demo
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 diffusion_pytorch_model.fp16.safetensors:  21%|██████████████████▎                                                                      | 1.06G/5.14G [26:42<1:42:48, 661kB/s]
 model.fp16.safetensors: 100%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████| 1.39G/1.39G [31:36<00:00, 732kB/s]
 Fetching 19 files:  79%|████████████████████████████████████████████████████████████████████████████████████████████▎                        | 15/19 [31:38<08:26, 126.54s/it]
