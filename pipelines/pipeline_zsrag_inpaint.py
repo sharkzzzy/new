@@ -484,7 +484,30 @@ class ZSRAGPipeline:
         """
         Stage D: SDEdit with ControlNet.
         """
-        # Lazy Load ControlNets
+        # =========================================================
+        # 显存大清洗 (针对 FP32 用户必须执行)
+        # =========================================================
+        print("[ZS-RAG] Moving Stage C models to CPU to free VRAM for ControlNet...")
+        
+        # 1. 卸载 Base Pipeline 组件
+        self.pipe.unet.to("cpu")
+        self.pipe.vae.to("cpu")
+        self.pipe.text_encoder.to("cpu")
+        self.pipe.text_encoder_2.to("cpu")
+        
+        # 2. 卸载 IP-Adapter
+        self.ip_adapter.image_proj.to("cpu")
+        self.ip_adapter.clip_image_encoder.to("cpu")
+        self.ip_adapter.resampler.to("cpu") # 如果有的话
+        
+        # 3. 卸载 CLIP Evaluator
+        self.clip_eval.model.to("cpu")
+        
+        # 4. 清理缓存
+        torch.cuda.empty_cache()
+        # =========================================================
+
+        # Lazy Load ControlNets (以下代码保持不变)
         if self.cn_builder is None:
             controlnets = {}
             # Using SDXL compatible ControlNets (e.g., Canny/Depth)
