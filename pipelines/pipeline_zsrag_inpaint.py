@@ -274,7 +274,6 @@ class ZSRAGPipeline:
                 "added_neg": ({"text_embeds": nt_pp, "time_ids": add_time_ids} if nt_pp is not None else None),
             }
         return embs
-
     @torch.no_grad()
     def bind_attributes(
         self,
@@ -283,17 +282,22 @@ class ZSRAGPipeline:
         width: int,
         height: int,
         mask_mgr: DynamicMaskManager,
+        # 新增/调整参数
+        init_image: Optional[Image.Image] = None, # Stage A 的输出
+        start_strength: float = 0.6,              # SDEdit 起始强度 (0.6 保留 40% 原图结构)
+        delay_gate_step: int = 8,                 # 前8步不开启 Cross-Attn 门控
+        
         num_inference_steps: int = 40,
         cfg_pos: float = 7.5,
         cfg_neg: float = 3.0,
-        kappa: float = 1.0,
+        kappa: float = 1.0,                       # 基础 Kappa，内部会有分段调度
         seed: int = 42,
         iter_clip: int = 2,
         clip_threshold: float = 0.32,
         probe_interval: int = 5,
     ) -> Dict[str, Any]:
         """
-        Stage C: Attribute Binding Loop.
+        Stage C: Attribute Binding Loop (Refined Logic).
         """
         seed_everything(seed)
         H_lat, W_lat = get_base_latent_size(width, height, downsample=8)
@@ -301,32 +305,40 @@ class ZSRAGPipeline:
 
         scheduler = self.pipe.scheduler
         
-        # Initial Latents (Created once, reused as starting point)
-        # Note: timesteps will be set inside the loop
-        latents = prepare_latents(1, 4, H_lat, W_lat, self.pipe.unet.dtype, self.device, scheduler, seed=seed)
+        # 1. Latent Initialization (SDEdit Strategy)
+        # 使用 Stage A 的图作为基底，避免从纯噪声凭空造背景
+        latents, _ = prepare_latents(
+            1, 4, H_lat, W_lat, self.pipe.unet.dtype, self.device, scheduler, 
+            seed=seed, vae=self.pipe.vae, init_image=init_image, strength=start_strength
+        )
 
-        # Global Background Embeds
+        # Global Embeds
         ge_pos, ge_uncond, ge_pp, ge_np = encode_prompt_sdxl(self.pipe, global_prompt, "")
         added_global_pos = build_added_kwargs_sdxl(ge_pp, torch.tensor([[height, width, 0, 0, height, width]], dtype=torch.float32, device=self.device))
         added_global_uncond = build_added_kwargs_sdxl(ge_np, torch.tensor([[height, width, 0, 0, height, width]], dtype=torch.float32, device=self.device))
 
         # Subject Embeds (Initial)
+        # 注意：这里我们只准备文本，IP-Adapter 的 image token 会在循环内动态 merge
         embs_sub = self._prepare_subject_embeddings(width, height, subjects, add_ip_refs=True)
         self.attn_proc.set_key_agg_mode("mean")
 
-        # Per-Subject Config (for iteration)
+        # Per-Subject Config
         per_subject_cfg = {s["name"]: {"cfg_pos": float(cfg_pos), "cfg_neg": float(cfg_neg), "ip_weight": float(s.get("ip_weight", 1.0))} for s in subjects}
 
         image_out = None
         
-        # Iteration Loop (Feedback-Driven)
+        # --- Iteration Loop ---
         for iter_idx in range(max(1, int(iter_clip) + 1)):
             
-            # 【CRITICAL FIX】Reset scheduler state for each iteration
-            # This resets 'step_index' to 0 and re-calculates sigmas
-            timesteps = prepare_timesteps(scheduler, num_inference_steps=num_inference_steps, device=self.device)
+            # A. Scheduler Reset & Timestep Slicing (SDEdit)
+            # 先获取完整 timesteps，然后截取后半段
+            scheduler.set_timesteps(num_inference_steps, device=self.device)
+            timesteps_all = scheduler.timesteps
+            # 根据 strength 截取：例如 strength=0.6，取最后 60% 的步数
+            start_step_idx = int(len(timesteps_all) * (1 - start_strength))
+            timesteps = timesteps_all[start_step_idx:]
             
-            # CLIP Feedback Adjustment
+            # B. CLIP Feedback Adjustment
             if iter_idx > 0 and image_out is not None:
                 masks_img = mask_mgr.get_masks_img()
                 eval_result, suggestions = evaluate_and_suggest(
@@ -339,39 +351,39 @@ class ZSRAGPipeline:
                     base_cfg_neg=cfg_neg, 
                     base_ip_weight=1.0
                 )
-                
-                # Apply suggestions with HARD CAP on ip_weight
+                # Apply suggestions
                 for name, sug in suggestions.items():
-                    if "ip_weight" in sug:
-                        sug["ip_weight"] = min(sug["ip_weight"], 1.0) # 封顶 1.0
                     per_subject_cfg[name].update(sug)
-
-                
                 print(f"[ZS-RAG] Iter {iter_idx} CLIP suggestions: {per_subject_cfg}")
 
-            # Diffusion Loop
-            # Always start from the original noisy latents for Fair Comparison between iterations
+            # C. Latent Reset
             latents_iter = latents.clone() 
             
-            for step_idx, t in enumerate(timesteps):
-                self.attn_proc.set_step_index(step_idx, num_inference_steps)
+            # --- Diffusion Loop ---
+            for step_rel_idx, t in enumerate(timesteps):
+                # 真实的 step index (从 0 开始计数，用于 Layer 调度)
+                # 但对于 SDEdit，我们是在去噪过程的中途，attn_proc 应该知道这是第几步吗？
+                # AlphaScheduler通常看整体进度。这里简单用相对进度。
+                # 也可以用 absolute_step = start_step_idx + step_rel_idx
+                self.attn_proc.set_step_index(step_rel_idx, len(timesteps))
+                
                 latent_model_input = scheduler.scale_model_input(latents_iter, t)
 
-                # 1. Background Recording (Phase A)
-                if step_idx % 3 == 0:
+                # D. Phase A: Background Recording
+                # 仅在关键节点更新背景结构，减少计算
+                if step_rel_idx % 3 == 0:
                     self.context_bank.clear()
                     self.attn_proc.set_mode("record_bg")
                     self.attn_proc.set_probe_enabled(False)
                     self.attn_proc.set_cross_gate_enabled(False)
                     self.attn_proc.set_region_mask(None)
-                    
                     forward_with_gate(
                         self.pipe.unet, latent_model_input, t, ge_pos, added_global_pos, 
                         attn_proc=self.attn_proc, gate_enabled=False, mode="record_bg", 
                         probe=False, region_mask=None, subject_id=None
                     )
 
-                # 2. Background Prediction
+                # E. Phase B: Background Prediction (Ungated)
                 eps_bg = compute_cfg_raca(
                     self.pipe.unet, latent_model_input, t,
                     emb_pos=ge_pos, emb_uncond=ge_uncond,
@@ -379,15 +391,28 @@ class ZSRAGPipeline:
                     added_cond_kwargs_uncond=added_global_uncond,
                     attn_proc=self.attn_proc,
                     cfg_pos=float(cfg_pos),
-                    gate_uncond=False, gate_pos=False, 
+                    gate_uncond=False, gate_pos=False, # Background is global base
                     mode_uncond="off", mode_pos="off",
                 )
 
-                # 3. Subject Predictions
+                # F. Phase C: Subject Predictions
                 eps_subjects = {}
                 masks_latent_gate, _ = mask_mgr.get_masks_latent()
-                do_probe = (step_idx % max(1, int(probe_interval)) == 0)
+                do_probe = (step_rel_idx % max(1, int(probe_interval)) == 0)
                 self.attn_proc.set_probe_enabled(do_probe)
+
+                # 策略控制：延迟门控 & Kappa 分段
+                # 前几步不门控，让背景充分形成
+                is_early_stage = step_rel_idx < delay_gate_step
+                gate_pos_curr = False if is_early_stage else True
+                
+                # Kappa 调度：前期弱，后期强
+                # 假设总步数 25 (strength 0.6 * 40)
+                if step_rel_idx < 8: kappa_curr = 0.6
+                elif step_rel_idx < 18: kappa_curr = 0.9
+                else: kappa_curr = 1.1
+                # 乘以基础 kappa
+                kappa_curr *= float(kappa)
 
                 for subj_idx, s in enumerate(subjects):
                     name = s["name"]
@@ -396,25 +421,30 @@ class ZSRAGPipeline:
                     self.attn_proc.set_region_mask(masks_latent_gate[name])
                     self.attn_proc.set_subject_id(subj_idx)
 
-                    # Dynamic IP-Adapter Weight Update
-                    if "ip_weight" in per_subject_cfg[name]:
-                        # Optimized: Re-merge only if weight changed significant logic needed here
-                        # For now, simplistic re-calc (performance hit is minimal compared to UNet)
-                        ref_image = s.get("ref_image", None)
-                        if ref_image is None:
-                            color_rgb = parse_color_from_text(s["prompt"])
-                            if color_rgb is not None:
-                                ref_image = make_color_patch(color_rgb, size=(256, 256))
-                                
-                        if ref_image is not None:
-                            self.ip_mgr.clear()
-                            self.ip_mgr.add_reference(name, ref_image, weight=float(per_subject_cfg[name]["ip_weight"]))
-                            
-                            # 【关键修正】始终使用 pos_raw (纯文本) 进行 merge，而不是在 emb["pos"] 上累加
-                            emb["pos"] = self.ip_mgr.merge_subject_refs_into_text(name, emb["pos_raw"], agg="mean")
+                    # Dynamic IP-Adapter Weight Update (Staged Strategy)
+                    # 第一轮(iter=0) 禁用或弱化 IP-Adapter，保结构
+                    # 第二轮(iter>0) 允许开启，且受 CLIP 建议控制，但封顶
+                    target_ip_w = float(per_subject_cfg[name]["ip_weight"])
+                    if iter_idx == 0:
+                        current_ip_w = 0.0 # 第一轮完全关闭 IP-Adapter，只靠 Text 和 SDEdit 保背景
+                    else:
+                        current_ip_w = min(target_ip_w, 1.0) # 封顶 1.0
 
+                    # 实时更新 Embeddings (使用 pos_raw 避免累积)
+                    ref_image = s.get("ref_image", None)
+                    if ref_image is None:
+                        color_rgb = parse_color_from_text(s["prompt"])
+                        if color_rgb: ref_image = make_color_patch(color_rgb)
+                    
+                    # 只有当权重 > 0 时才注入
+                    if ref_image is not None and current_ip_w > 0.01:
+                        self.ip_mgr.clear()
+                        self.ip_mgr.add_reference(name, ref_image, weight=current_ip_w)
+                        emb["pos"] = self.ip_mgr.merge_subject_refs_into_text(name, emb["pos_raw"], agg="mean")
+                    else:
+                        emb["pos"] = emb["pos_raw"] # 回退到纯文本
 
-                    # CFG Calculation
+                    # CFG Calculation (Contrastive)
                     if emb["neg"] is not None and emb["added_neg"] is not None:
                         eps_sub = compute_contrastive_cfg_raca(
                             self.pipe.unet, latent_model_input, t,
@@ -427,7 +457,9 @@ class ZSRAGPipeline:
                             region_mask=masks_latent_gate[name],
                             subject_id=subj_idx,
                             probe_pos=do_probe,
-                            gate_uncond=False, gate_pos=True, gate_neg=True,
+                            gate_uncond=False, 
+                            gate_pos=gate_pos_curr, # 延迟门控策略
+                            gate_neg=gate_pos_curr,
                             mode_uncond="off", mode_pos="inject_subject", mode_neg="inject_subject",
                         )
                     else:
@@ -440,7 +472,8 @@ class ZSRAGPipeline:
                             region_mask=masks_latent_gate[name],
                             subject_id=subj_idx,
                             probe_pos=do_probe,
-                            gate_uncond=False, gate_pos=True,
+                            gate_uncond=False, 
+                            gate_pos=gate_pos_curr,
                             mode_uncond="off", mode_pos="inject_subject",
                         )
                     eps_subjects[name] = eps_sub
@@ -448,13 +481,14 @@ class ZSRAGPipeline:
                 self.attn_proc.set_probe_enabled(False)
                 self.attn_proc.set_region_mask(None)
 
-                # 4. Latent Blending
-                eps_final = mask_mgr.energy_minimize_blend(eps_bg, eps_subjects, kappa=float(kappa))
+                # G. Latent Blending (Energy Minimized)
+                # 传入 s_max=0.6 限制主体冲击力
+                eps_final = mask_mgr.energy_minimize_blend(eps_bg, eps_subjects, kappa=kappa_curr, s_max=0.6)
 
-                # 5. Step
+                # H. Step
                 latents_iter = scheduler.step(eps_final, t, latents_iter).prev_sample
 
-                # 6. Mask Update (Probing)
+                # I. Mask Update (Probing)
                 if do_probe:
                     attn_maps = self.attn_proc.pop_attn_maps()
                     maps_img = {}
@@ -462,16 +496,15 @@ class ZSRAGPipeline:
                         name = subjects[sid]["name"]
                         maps_img[name] = F.interpolate(amap, size=(height, width), mode="bilinear", align_corners=False)
                     if maps_img:
-                        mask_mgr.update_from_attn(maps_img, beta=0.6, thresh=0.5, erode_k=5, blur_ksize=15, blur_sigma=2.5)
+                        # 稍微收紧腐蚀，避免掩码过度膨胀
+                        mask_mgr.update_from_attn(maps_img, beta=0.5, thresh=0.55, erode_k=7, blur_ksize=15, blur_sigma=2.5)
 
-            # Decode Final Image for this iteration
-            # We must decode to evaluate CLIP scores for the next loop
+            # Decode
             image_out = decode_vae(self.pipe.vae, latents_iter)
-            
-            # Update latents for final return (after loop ends)
             final_latents = latents_iter.clone()
 
         return {"image": image_out, "latents": final_latents, "masks_img": mask_mgr.get_masks_img()}
+
 
 
     # ---------------------------------
