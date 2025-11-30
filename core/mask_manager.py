@@ -214,35 +214,39 @@ class DynamicMaskManager:
         
         weights = {name: w_list[i] for i, name in enumerate(self.subject_names)}
         return weights, w_bg
-
-    def energy_minimize_blend(self, eps_bg: torch.Tensor, eps_subjects: Dict[str, torch.Tensor], kappa: float = 1.0) -> torch.Tensor:
+    def energy_minimize_blend(
+        self, 
+        eps_bg: torch.Tensor, 
+        eps_subjects: Dict[str, torch.Tensor], 
+        kappa: float = 1.0
+    ) -> torch.Tensor:
         """
         Performs "Energy Minimization" blending in latent space.
-        Applies extra smoothing to blending weights to avoid hard seams.
+        FIXED LOGIC: Only apply differential guidance on top of background.
+        Do NOT re-normalize and reconstruct the whole image, which kills the background.
         """
         weights, w_bg = self.build_latent_fusion_weights()
         
         def smooth_w(w: torch.Tensor):
             return _feather(w, radius=max(1, self.feather_radius_lat)).clamp(0.0, 1.0)
 
-        w_bg_s = smooth_w(w_bg)
-        eps_final = eps_bg * w_bg_s
+        # Base is background prediction
+        eps_final = eps_bg.clone()
         
         for name, eps_s in eps_subjects.items():
+            # Get smoothed weight for this subject
             w = smooth_w(weights[name])
+            
+            # Differential guidance: (Subject - Background)
             diff = eps_s - eps_bg
+            
+            # Add difference to base
             eps_final = eps_final + kappa * w * diff
 
-        # Normalize final combination
-        stack_w = torch.stack([weights[n] for n in self.subject_names] + [w_bg_s], dim=0)
-        stack_w = _normalize_stack(stack_w)
+        # DELETE the re-normalization step completely.
+        # Background structure is preserved in eps_bg, subjects are added as deltas.
         
-        eps_out = torch.zeros_like(eps_bg)
-        for i, name in enumerate(self.subject_names):
-            eps_out = eps_out + stack_w[i] * eps_subjects[name]
-        
-        eps_out = eps_out + stack_w[-1] * eps_bg
-        return eps_out
+        return eps_final
 
     # -----------------------
     # Internal Logic
