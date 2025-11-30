@@ -106,7 +106,7 @@ class ZSRAGPipeline:
         alpha_scheduler = AlphaScheduler()  
         # LayerSelector controls where RACA gating is applied
         layer_selector = LayerSelector(
-            patterns=raca_layer_patterns or ["down_blocks.1", "down_blocks.2", "mid_block", "up_blocks.0", "up_blocks.1"]
+            patterns=raca_layer_patterns or [ "down_blocks.2", "mid_block", "up_blocks.0", "up_blocks.1"]
         )
         self.attn_proc = RACAAttentionProcessor(self.context_bank, alpha_scheduler, layer_selector)
         attach_attention_processor(self.pipe.unet, self.attn_proc)
