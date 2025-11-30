@@ -496,7 +496,6 @@ class ZSRAGPipeline:
         self.pipe.text_encoder_2.to("cpu")
         
         # 2. 卸载 IP-Adapter
-        self.ip_adapter.image_proj.to("cpu")
         self.ip_adapter.clip_image_encoder.to("cpu")
         self.ip_adapter.resampler.to("cpu") # 如果有的话
         
