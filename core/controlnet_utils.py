@@ -233,9 +233,8 @@ def run_controlnet_inpaint(
     imgs = out.images if hasattr(out, "images") else out[0]
     return imgs[0]
 
-
 def sdxl_sde_edit(
-    pipe_inpaint: StableDiffusionXLControlNetInpaintPipeline,
+    pipe_inpaint: Any, # 放宽类型注解以兼容不同 Pipeline
     image: Union[Image.Image, torch.Tensor],
     prompt: str,
     control_images: List[Image.Image],
@@ -243,11 +242,11 @@ def sdxl_sde_edit(
     num_inference_steps: int = 20,
     guidance_scale: float = 5.0,
     seed: Optional[int] = None,
+    # 【新增】支持传入 Mask
+    mask_image: Optional[Union[Image.Image, torch.Tensor]] = None,
 ) -> Image.Image:
     """
-    Global SDEdit refinement.
-    Uses Inpaint pipeline with a full-white mask (or just img2img mode) to refine the whole image.
-    Low strength (0.2-0.35) preserves structure while unifying lighting.
+    Global SDEdit refinement with optional Mask.
     """
     _ensure_deps()
     generator = None
@@ -255,22 +254,32 @@ def sdxl_sde_edit(
         generator = torch.Generator(device=pipe_inpaint.device).manual_seed(int(seed))
         
     img_pil = _to_pil(image)
-    H, W = img_pil.height, img_pil.width
     
-    # Full white mask = edit everything
-    # (InpaintPipeline treats white as "inpainting area", black as "keep")
-    mask = Image.new("L", (W, H), color=255)
+    # 如果没有传入 mask，则创建全白 mask (代表全图重绘)
+    if mask_image is None:
+        H, W = img_pil.height, img_pil.width
+        mask_pil = Image.new("L", (W, H), color=255)
+    else:
+        mask_pil = _to_pil(mask_image)
     
-    out = pipe_inpaint(
-        prompt=prompt,
-        image=img_pil,
-        mask_image=mask,
-        control_image=control_images,
-        num_inference_steps=num_inference_steps,
-        guidance_scale=guidance_scale,
-        strength=strength,
-        generator=generator,
-    )
+    # 构造参数字典
+    kwargs = {
+        "prompt": prompt,
+        "image": img_pil,
+        "mask_image": mask_pil, # 传入 Mask
+        "control_image": control_images,
+        "num_inference_steps": num_inference_steps,
+        "guidance_scale": guidance_scale,
+        "strength": strength,
+        "generator": generator,
+    }
+    
+    # 兼容性处理：如果 pipe 不支持 control_image (比如普通的 Img2ImgPipe)，则移除该参数
+    # 但我们这里假设是 ControlNetPipe 或 InpaintPipe
+    if len(control_images) == 0:
+        kwargs.pop("control_image")
+
+    out = pipe_inpaint(**kwargs)
     
     imgs = out.images if hasattr(out, "images") else out[0]
     return imgs[0]
