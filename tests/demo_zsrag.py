@@ -44,24 +44,21 @@ def main():
         # Stage A
         bootstrap_steps=20,
         bootstrap_guidance=5.5,
-        
-        # Stage B (你的参数建议)
         safety_expand=0.0,
-        tau=1.0,             # 互斥更弱
-        bg_floor=0.18,       # 背景底权提高
-        gap_ratio=0.12,      # 中缝加宽
+        tau=1.0,
+        bg_floor=0.18,
+        gap_ratio=0.12,
+        feather_radius_img=7,
+        feather_radius_lat=1,
         
-        # Stage C
-        num_inference_steps=40,
-        cfg_pos=7.5,
-        cfg_neg=3.0,
-        kappa=1.0,           # 保持 1.0 即可，因为逻辑改了
-        iter_clip=1,         # 跑一轮迭代即可验证
-        clip_threshold=0.32,
-        probe_interval=5,
+        # Stage C (强力生成主体)
+        kappa=1.5,           # 强力注入
+        start_strength=0.90, # 几乎重绘
+        delay_gate_step=8,   # 延迟门控
+        iter_clip=1,         # 跑一轮即可
         
-        # Stage D
-        sde_strength=0.3,
+        # Stage D (参数已在 run_zsrag 内部 Two-Pass 逻辑中定死，这里传参主要影响默认值)
+        sde_strength=0.35, 
         sde_steps=20,
         sde_guidance=5.0,
         
