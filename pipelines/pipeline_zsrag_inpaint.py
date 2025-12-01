@@ -534,6 +534,7 @@ class ZSRAGPipeline:
         num_inference_steps: int = 20,
         guidance_scale: float = 5.0,
         seed: Optional[int] = None,
+        mask_image: Optional[Image.Image] = None,
     ) -> Image.Image:
         """
         Stage D: SDEdit with ControlNet.
@@ -614,10 +615,10 @@ class ZSRAGPipeline:
                 pack.add("canny", control_lineart)
             elif key == "depth" and control_depth is not None:
                 pack.add("depth", control_depth)
-
         img_sde = sdxl_sde_edit(
             pipe_inpaint,
             image=init_image,
+            mask_image=mask_image, # 【新增】
             prompt=global_prompt,
             control_images=pack.get(),
             strength=strength,
@@ -625,8 +626,7 @@ class ZSRAGPipeline:
             guidance_scale=guidance_scale,
             seed=seed,
         )
-        return img_sde
-
+       
 
 
 # ---------------------------------
@@ -701,26 +701,59 @@ def run_zsrag(
     # Stage D
 
     print("[runner] Extracting new control signals from Stage C result...")
-    extractor = ControlSignalExtractor(target_size=(width, height))
-    extractor.set_image(bind["image"][0]) # Stage C 的图
-    new_lineart = extractor.compute_lineart(coarse=False)
-    # new_depth = extractor.compute_depth(method="zoe") # 显存够可以开，不够就算了，Lineart 够用了
-
-    # 【修改】使用 new_lineart 运行 Stage D
-    print("[runner] Stage D: Global harmonization (SDEdit)...")
-    img_harmonized = pipeline.harmonize_global(
-        init_image=bind["image"][0], 
-        global_prompt=global_prompt, 
-        width=width, height=height, 
-        
-        control_lineart=new_lineart, # 使用新线稿！
-        control_depth=None,          # 建议关闭 Depth，避免 OOM 且减少冲突
-        
-        strength=sde_strength, 
-        num_inference_steps=sde_steps, 
-        guidance_scale=sde_guidance, 
-        seed=seed
+    # 1. 准备 Mask (主体 & 背景)
+    from zsrag.core.utils import to_pil
+    masks_img = mask_mgr.get_masks_img()
+    subj_mask_t = mask_mgr.merge_masks_union(masks_img) # [1,1,H,W]
+    if subj_mask_t is None:
+        subj_mask_t = torch.zeros((1, 1, height, width))
+    
+    # 转 PIL
+    subj_mask_pil = to_pil(subj_mask_t[0]) # 白=主体
+    bg_mask_t = 1.0 - subj_mask_t
+    bg_mask_pil = to_pil(bg_mask_t[0])     # 白=背景
+    
+    # 2. Pass 1: Refine Subjects (修猫)
+    print("  -> Pass 1: Refining Subjects (Strength 0.35, Full Prompt)...")
+    
+    # 构造包含主体的 Prompt
+    subject_prompts = [s["prompt"] for s in subjects]
+    full_prompt = f"{global_prompt}, {', '.join(subject_prompts)}"
+    
+    # 调用 harmonize (ControlNet 置空，纯 SDEdit)
+    img_pass1 = pipeline.harmonize_global(
+        init_image=bind["image"][0],
+        mask_image=subj_mask_pil,   # 只改主体
+        global_prompt=full_prompt,  # 描述主体
+        width=width, height=height,
+        control_lineart=None, control_depth=None, # 禁用 ControlNet
+        strength=0.35,              # 稍强，去模糊
+        num_inference_steps=sde_steps,
+        guidance_scale=5.0, seed=seed
     )
+    
+    # 3. Pass 2: Harmonize Background (修背景)
+    # 注意：此时 pipeline 内部的 self.pipe 已经被 Pass 1 销毁了，
+    # 但 harmonize_global 会重用它创建的 cn_builder (如果没销毁的话)。
+    # 实际上 harmonize_global 每次都会检查 cn_builder。
+    # 为了复用 Pass 1 的 Inpaint Pipeline (在 GPU 上)，我们需要微调 harmonize_global 
+    # 或者简单点：run_zsrag 里手动管理 Pass 2。
+    # 
+    # 为了代码复用，我们直接再次调用 harmonize_global。
+    # 并在 harmonize_global 里加个判断：如果 self.pipe 已经是 None，就不报错。
+    
+    print("  -> Pass 2: Harmonizing Background (Strength 0.25, Global Prompt)...")
+    img_harmonized = pipeline.harmonize_global(
+        init_image=img_pass1,       # 接力
+        mask_image=bg_mask_pil,     # 只改背景
+        global_prompt=global_prompt,# 纯背景 Prompt
+        width=width, height=height,
+        control_lineart=None, control_depth=None,
+        strength=0.25,              # 弱修，统一光影
+        num_inference_steps=sde_steps,
+        guidance_scale=5.0, seed=seed
+    )
+
     if save_dir and img_harmonized:
         img_harmonized.save(os.path.join(save_dir, "stageD_harmonized.png"))
 
