@@ -699,10 +699,27 @@ def run_zsrag(
         save_image_tensor(bind["image"], os.path.join(save_dir, "stageC_bind.png"))
 
     # Stage D
+
+    print("[runner] Extracting new control signals from Stage C result...")
+    extractor = ControlSignalExtractor(target_size=(width, height))
+    extractor.set_image(bind["image"][0]) # Stage C 的图
+    new_lineart = extractor.compute_lineart(coarse=False)
+    # new_depth = extractor.compute_depth(method="zoe") # 显存够可以开，不够就算了，Lineart 够用了
+
+    # 【修改】使用 new_lineart 运行 Stage D
+    print("[runner] Stage D: Global harmonization (SDEdit)...")
     img_harmonized = pipeline.harmonize_global(
-        init_image=bind["image"][0], global_prompt=global_prompt, width=width, height=height, 
-        control_lineart=boot["lineart"], control_depth=boot["depth"], 
-        strength=sde_strength, num_inference_steps=sde_steps, guidance_scale=sde_guidance, seed=seed
+        init_image=bind["image"][0], 
+        global_prompt=global_prompt, 
+        width=width, height=height, 
+        
+        control_lineart=new_lineart, # 使用新线稿！
+        control_depth=None,          # 建议关闭 Depth，避免 OOM 且减少冲突
+        
+        strength=sde_strength, 
+        num_inference_steps=sde_steps, 
+        guidance_scale=sde_guidance, 
+        seed=seed
     )
     if save_dir and img_harmonized:
         img_harmonized.save(os.path.join(save_dir, "stageD_harmonized.png"))
