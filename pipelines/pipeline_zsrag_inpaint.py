@@ -604,6 +604,8 @@ class ZSRAGPipeline:
             )
 
         pipe_inpaint = self.cn_builder.get_inpaint_pipeline()
+        pipe_inpaint.enable_model_cpu_offload()
+
 
         # Pack Control Images
         pack = ControlImagePack(target_size=(width, height))
