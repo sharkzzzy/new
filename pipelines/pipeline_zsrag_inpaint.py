@@ -543,10 +543,11 @@ class ZSRAGPipeline:
         # 激进显存清理：彻底销毁 Stage C 的模型
         # =========================================================
         print("[ZS-RAG] Destroying Stage C models to free VRAM for ControlNet...")
-        # 1. Base Pipe Offload (Safe)
+        # 1. Base Pipe -> CPU
         p = getattr(self, "pipe", None)
         if p is not None:
             # 遍历组件，安全移至 CPU
+            # 使用 try-except 防止某些组件本身已经是 None 或不支持 .to()
             for comp_name in ("unet", "vae", "text_encoder", "text_encoder_2"):
                 m = getattr(p, comp_name, None)
                 if m is not None:
@@ -555,10 +556,9 @@ class ZSRAGPipeline:
                     except Exception:
                         pass
         
-        # 2. IP-Adapter Offload (Safe)
+        # 2. IP-Adapter -> CPU
         ia = getattr(self, "ip_adapter", None)
         if ia is not None:
-            # 兼容旧版 MLP 和新版 Resampler 的属性名
             for comp_name in ("image_proj", "resampler", "clip_image_encoder"):
                 m = getattr(ia, comp_name, None)
                 if m is not None:
@@ -567,7 +567,7 @@ class ZSRAGPipeline:
                     except Exception:
                         pass
 
-        # 3. CLIP Eval Offload (Safe)
+        # 3. CLIP Eval -> CPU
         ce = getattr(self, "clip_eval", None)
         if ce is not None:
             m = getattr(ce, "model", None)
