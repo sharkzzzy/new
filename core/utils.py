@@ -315,3 +315,43 @@ def save_image_tensor(image: torch.Tensor, path: str):
         
     pil = TF.to_pil_image((img * 255.0).round().to(torch.uint8))
     pil.save(path)
+def shift_tensor(tensor: torch.Tensor, src_box: Tuple[int, int, int, int], dst_box: Tuple[int, int, int, int], canvas_size: Tuple[int, int]) -> torch.Tensor:
+    """
+    Shifts a feature tensor [B, C, H, W] from src_box to dst_box using affine grid.
+    
+    Args:
+        tensor: Feature map [B, C, H, W]
+        src_box: (x1, y1, x2, y2) in canvas coordinates
+        dst_box: (x1, y1, x2, y2) in canvas coordinates
+        canvas_size: (W, H) of the original image space (e.g. 1024x1024)
+    """
+    B, C, H, W = tensor.shape
+    
+    # Calculate scale factor between feature map and canvas
+    scale_x = W / canvas_size[0]
+    scale_y = H / canvas_size[1]
+    
+    # Scale boxes to feature map coordinates
+    sx1, sy1 = src_box[0]*scale_x, src_box[1]*scale_y
+    sx2, sy2 = src_box[2]*scale_x, src_box[3]*scale_y
+    dx1, dy1 = dst_box[0]*scale_x, dst_box[1]*scale_y
+    
+    # Calculate shift (translation)
+    # We assume we center-align the source content to the dest content
+    src_center_x, src_center_y = (sx1 + sx2) / 2, (sy1 + sy2) / 2
+    dst_center_x, dst_center_y = (dx1 + dx2) / 2, (dy1 + dy2) / 2
+    
+    shift_x = (dst_center_x - src_center_x) / W * 2 # Normalize to [-1, 1] range for grid_sample
+    shift_y = (dst_center_y - src_center_y) / H * 2
+    
+    # Construct Affine Matrix [1, 0, tx], [0, 1, ty]
+    # Note: grid_sample uses inverse mapping (dst -> src). 
+    # If we want to move src to dst, the sampling grid at dst should look at src.
+    # So we need to subtract the shift.
+    theta = torch.tensor([[1, 0, -shift_x], [0, 1, -shift_y]], dtype=tensor.dtype, device=tensor.device)
+    theta = theta.unsqueeze(0).repeat(B, 1, 1)
+    
+    grid = F.affine_grid(theta, tensor.size(), align_corners=False)
+    shifted = F.grid_sample(tensor, grid, align_corners=False, padding_mode="zeros") # Padding with zeros is safer for features
+    
+    return shifted
