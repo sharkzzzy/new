@@ -543,9 +543,7 @@ class ZSRAGPipeline:
         # 激进显存清理：彻底销毁 Stage C 的模型
         # =========================================================
         print("[ZS-RAG] Destroying Stage C models to free VRAM for ControlNet...")
-        
-        # 1. 移动到 CPU 并删除引用
-        if hasattr(self, "pipe"):
+        if hasattr(self, "pipe") and self.pipe is not None:
             self.pipe.unet.to("cpu")
             self.pipe.vae.to("cpu")
             self.pipe.text_encoder.to("cpu")
@@ -555,9 +553,10 @@ class ZSRAGPipeline:
             del self.pipe.text_encoder
             del self.pipe.text_encoder_2
             del self.pipe
-            self.pipe = None # 标记为 None
+            self.pipe = None 
 
-        if hasattr(self, "ip_adapter"):
+        # 【修改】增加 self.ip_adapter is not None 的判断
+        if hasattr(self, "ip_adapter") and self.ip_adapter is not None:
             self.ip_adapter.clip_image_encoder.to("cpu")
             if hasattr(self.ip_adapter, "resampler"):
                 self.ip_adapter.resampler.to("cpu")
@@ -566,10 +565,11 @@ class ZSRAGPipeline:
             del self.ip_adapter
             self.ip_adapter = None
 
-        if hasattr(self, "clip_eval"):
+        if hasattr(self, "clip_eval") and self.clip_eval is not None:
             self.clip_eval.model.to("cpu")
             del self.clip_eval
             self.clip_eval = None
+   
             
         # 2. 强制 Python 垃圾回收
         import gc
