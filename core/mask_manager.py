@@ -430,3 +430,21 @@ class DynamicMaskManager:
         if z_order:
             mgr.set_z_order(z_order)
         return mgr
+
+    @staticmethod
+    def merge_masks_union(
+        masks_img: Dict[str, torch.Tensor],
+        names_order: Optional[List[str]] = None,
+    ) -> torch.Tensor:
+        """ 
+        Returns union of multiple masks. 
+        masks_img: {name: [1,1,H,W]}
+        Returns: [1,1,H,W] (max across all masks) or None
+        """
+        keys = names_order if names_order else list(masks_img.keys())
+        base = None
+        for k in keys:
+            if k in masks_img:
+                m = masks_img[k]
+                base = m.clone() if base is None else torch.max(base, m)
+        return base
