@@ -634,7 +634,7 @@ class ZSRAGPipeline:
 # ---------------------------------
 @torch.no_grad()
 def run_zsrag(
-    pipeline: ZSRAGPipeline,  # Pass initialized pipeline
+    pipeline: ZSRAGPipeline,
     global_prompt: str,
     subjects: List[Dict[str, str]],
     width: int = 1024,
@@ -648,6 +648,8 @@ def run_zsrag(
     tau: float = 0.8,
     bg_floor: float = 0.05,
     gap_ratio: float = 0.06,
+    feather_radius_img: int = 15, # 新增
+    feather_radius_lat: int = 3,  # 新增
     # Stage C
     num_inference_steps: int = 40,
     cfg_pos: float = 7.5,
@@ -656,12 +658,15 @@ def run_zsrag(
     iter_clip: int = 2,
     clip_threshold: float = 0.32,
     probe_interval: int = 5,
+    start_strength: float = 0.6,  # 确保有这个
+    delay_gate_step: int = 8,     # 确保有这个
     # Stage D
     sde_strength: float = 0.3,
     sde_steps: int = 20,
     sde_guidance: float = 5.0,
     save_dir: Optional[str] = None,
 ) -> Dict[str, Any]:
+
     """
     Executes the full ZS-RAG pipeline.
     """
@@ -676,14 +681,16 @@ def run_zsrag(
         boot["image"].save(os.path.join(save_dir, "stageA_bootstrap.png"))
         if boot["lineart"]: boot["lineart"].save(os.path.join(save_dir, "stageA_lineart.png"))
         if boot["depth"]: boot["depth"].save(os.path.join(save_dir, "stageA_depth.png"))
-
     # Stage B
     mask_mgr = pipeline.build_masks(
         subjects, image_size=(width, height), latent_downsample=8, 
         init_mode="positions", external_masks_img=None, 
         safety_expand=safety_expand, tau=tau, bg_floor=bg_floor, gap_ratio=gap_ratio,
-        feather_radius_img=15, feather_radius_lat=3
+        # 【新增传递】
+        feather_radius_img=feather_radius_img, 
+        feather_radius_lat=feather_radius_lat
     )
+ 
     bind = pipeline.bind_attributes(
         global_prompt=global_prompt, subjects=subjects, width=width, height=height, 
         mask_mgr=mask_mgr, num_inference_steps=num_inference_steps, 
