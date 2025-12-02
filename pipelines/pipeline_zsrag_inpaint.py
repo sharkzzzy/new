@@ -543,38 +543,45 @@ class ZSRAGPipeline:
         # 激进显存清理：彻底销毁 Stage C 的模型
         # =========================================================
         print("[ZS-RAG] Destroying Stage C models to free VRAM for ControlNet...")
-        if hasattr(self, "pipe") and self.pipe is not None:
-            self.pipe.unet.to("cpu")
-            self.pipe.vae.to("cpu")
-            self.pipe.text_encoder.to("cpu")
-            self.pipe.text_encoder_2.to("cpu")
-            del self.pipe.unet
-            del self.pipe.vae
-            del self.pipe.text_encoder
-            del self.pipe.text_encoder_2
-            del self.pipe
-            self.pipe = None 
+        # 1. Base Pipe Offload (Safe)
+        p = getattr(self, "pipe", None)
+        if p is not None:
+            # 遍历组件，安全移至 CPU
+            for comp_name in ("unet", "vae", "text_encoder", "text_encoder_2"):
+                m = getattr(p, comp_name, None)
+                if m is not None:
+                    try:
+                        m.to("cpu")
+                    except Exception:
+                        pass
+        
+        # 2. IP-Adapter Offload (Safe)
+        ia = getattr(self, "ip_adapter", None)
+        if ia is not None:
+            # 兼容旧版 MLP 和新版 Resampler 的属性名
+            for comp_name in ("image_proj", "resampler", "clip_image_encoder"):
+                m = getattr(ia, comp_name, None)
+                if m is not None:
+                    try:
+                        m.to("cpu")
+                    except Exception:
+                        pass
 
-        # 【修改】增加 self.ip_adapter is not None 的判断
-        if hasattr(self, "ip_adapter") and self.ip_adapter is not None:
-            self.ip_adapter.clip_image_encoder.to("cpu")
-            if hasattr(self.ip_adapter, "resampler"):
-                self.ip_adapter.resampler.to("cpu")
-            if hasattr(self.ip_adapter, "image_proj"):
-                self.ip_adapter.image_proj.to("cpu")
-            del self.ip_adapter
-            self.ip_adapter = None
-
-        if hasattr(self, "clip_eval") and self.clip_eval is not None:
-            self.clip_eval.model.to("cpu")
-            del self.clip_eval
-            self.clip_eval = None
-   
+        # 3. CLIP Eval Offload (Safe)
+        ce = getattr(self, "clip_eval", None)
+        if ce is not None:
+            m = getattr(ce, "model", None)
+            if m is not None:
+                try:
+                    m.to("cpu")
+                except Exception:
+                    pass
             
-        # 2. 强制 Python 垃圾回收
+        # 4. Clear Cache
         import gc
         gc.collect()
         torch.cuda.empty_cache()
+  
         # =========================================================
 
         # Lazy Load ControlNets
