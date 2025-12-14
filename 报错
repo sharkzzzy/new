@@ -29,3 +29,6 @@ C	双路径 + APFG融合 + 混合注意力	52.44	38.71
 D	完整模型（双路径 + APFG + MSK）	53.21	60.62
 E	完整模型 - ECA模块	47.72	62.38
 F	完整模型 - PMC模块	46.08	68.69
+
+
+As illustrated in Fig. 1(b), its central component is the two-dimensional state space mechanism (2D-SSM), which captures global spatial context through a four-directional scanning process, please refer to [5] for more details about it. The SS2D module internally integrates both channel and spatial attention mechanisms as gates to enhance its feature selection capabilities. We posit that global semantic context modeling and local spatial detail refinement are distinct tasks, yet they share the same underlying feature foundation. Processing them sequentially within the single-path architecture of the original decoder may prevent either task from achieving optimal performance. The DVSS adopts a "shared base, separate enhancement" design philosophy. Its core idea is to have global and local processing share the same underlying feature source before undergoing task-specific optimization. 
