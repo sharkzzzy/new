@@ -30,5 +30,8 @@ D	完整模型（双路径 + APFG + MSK）	53.21	60.62
 E	完整模型 - ECA模块	47.72	62.38
 F	完整模型 - PMC模块	46.08	68.69
 
+门控增强型状态空间模块
 
-As illustrated in Fig. 1(b), its central component is the two-dimensional state space mechanism (2D-SSM), which captures global spatial context through a four-directional scanning process, please refer to [5] for more details about it. The SS2D module internally integrates both channel and spatial attention mechanisms as gates to enhance its feature selection capabilities. We posit that global semantic context modeling and local spatial detail refinement are distinct tasks, yet they share the same underlying feature foundation. Processing them sequentially within the single-path architecture of the original decoder may prevent either task from achieving optimal performance. The DVSS adopts a "shared base, separate enhancement" design philosophy. Its core idea is to have global and local processing share the same underlying feature source before undergoing task-specific optimization. 
+解耦视觉状态空间（Decoupled Visual State Space, DVSS）模块是本文解码器的核心组件，其结构如图1(c)所示。图1(b)展示了现有方法中典型的解码器结构，其核心组件为二维状态空间模块（SS2D），通过四方向扫描机制捕获全局空间上下文信息，同时采用通道注意力与空间注意力作为门控机制对SS2D的输出进行特征筛选。这种设计虽然引入了双路径形式，但注意力分支仅作为门控信号调制主路径输出，本质上仍是以全局建模为主导的耦合架构，对局部细节的增强能力有限。
+
+针对上述问题，本文提出DVSS模块，采用"共享基础、分离增强"的设计理念。与现有门控式设计不同，DVSS模块将全局语义建模与局部细节增强视为同等重要的并行任务，两条路径分别进行针对性优化后再进行自适应融合。 如图1(c)所示，DVSS模块在统一的特征基础上构建两条功能对等的专用路径，分别针对全局语义建模与局部细节增强进行优化。
