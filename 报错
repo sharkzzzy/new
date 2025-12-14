@@ -1,37 +1,9 @@
-3. 图表标题中英文统一（改为中文）
-图标题修改
-原英文	修改为中文
-图1 (a) Overall architecture of DP-UNet...	图1 DP-UNet网络结构。(a) 整体架构，红色箭头表示上采样，蓝色箭头表示下采样；(b) CSMamba模块；(c) 本文提出的DVSS模块
-图2 (a) The workflow of the PMC module...	图2 核心模块结构。(a) PMC模块工作流程；(b) APFG模块结构
-图3 The structure of the MSK module	图3 MSK模块结构
-图XX Qualitative performance comparisons on the ISPRS Potsdam...	图4 ISPRS Potsdam数据集可视化结果。(a) NIRRG影像；(b) UNetFormer；(c) CM-UNet；(d) DP-UNet
-图XXX (Vaihingen)	图5 ISPRS Vaihingen数据集可视化结果。(a) NIRRG影像；(b) UNetFormer；(c) CM-UNet；(d) DP-UNet
-图XXX (LoveDA)	图6 LoveDA数据集可视化结果。(a) NIRRG影像；(b) UNetFormer；(c) CM-UNet；(d) DP-UNet
-表标题修改
-原英文	修改为中文
-TABLE I EXPERIMENTAL RESULTS ON ISPRS POTSDAM DATASET	表1 ISPRS Potsdam数据集实验结果
-TABLE II EXPERIMENTAL RESULTS ON ISPRS VAIHINGEN DATASET	表2 ISPRS Vaihingen数据集实验结果
-TABLE III EXPERIMENTAL RESULTS ON LOVEDA DATASET	表3 LoveDA数据集实验结果
-TABLE IV ABLATION STUDY OF KEY COMPONENTS	表4 核心模块消融实验结果
-TABLE V MODEL COMPLEXITY COMPARISON	表5 模型复杂度对比
-4. 消融实验表格内容修改（去除baseline描述）
-当前表4：
-
-less
-A. Baseline: CM-UNet | Single-Path + MSAA | 52.84 | 53.86
-B. (A) - Remove SS2D-Attn | ...
-建议修改为：
-
-配置	结构描述	mIoU(%)	FPS
-A	单路径结构	47.30	69.37
-B	双路径 + 简单加法融合 + 混合注意力	51.16	46.35
-C	双路径 + APFG融合 + 混合注意力	52.44	38.71
-D	完整模型（双路径 + APFG + MSK）	53.21	60.62
-E	完整模型 - ECA模块	47.72	62.38
-F	完整模型 - PMC模块	46.08	68.69
-
-门控增强型状态空间模块
-
-解耦视觉状态空间（Decoupled Visual State Space, DVSS）模块是本文解码器的核心组件，其结构如图1(c)所示。图1(b)展示了现有方法中典型的解码器结构，其核心组件为二维状态空间模块（SS2D），通过四方向扫描机制捕获全局空间上下文信息，同时采用通道注意力与空间注意力作为门控机制对SS2D的输出进行特征筛选。这种设计虽然引入了双路径形式，但注意力分支仅作为门控信号调制主路径输出，本质上仍是以全局建模为主导的耦合架构，对局部细节的增强能力有限。
-
-针对上述问题，本文提出DVSS模块，采用"共享基础、分离增强"的设计理念。与现有门控式设计不同，DVSS模块将全局语义建模与局部细节增强视为同等重要的并行任务，两条路径分别进行针对性优化后再进行自适应融合。 如图1(c)所示，DVSS模块在统一的特征基础上构建两条功能对等的专用路径，分别针对全局语义建模与局部细节增强进行优化。
+表4 核心模块消融实验结果
+配置	解码器	多尺度融合	Param.(M)	mIoU(%)
+A	仅全局路径（SS2D+注意力门控）	仅跳跃连接	47.30	69.37
+B	全局路径+局部路径（加法融合）	仅跳跃连接	51.16	46.35
+C	全局路径+局部路径+APFG	仅跳跃连接	52.44	38.71
+D	全局路径+局部路径+APFG	MSK	53.21	60.62
+E	全局路径+局部路径+APFG 	混合注意力融合	51.83	40.67
+F	(D) - ECA	MSK	47.72	62.38
+G	(D) – PMC	MSK	46.08	68.69
